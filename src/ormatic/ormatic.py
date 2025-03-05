@@ -20,23 +20,23 @@ class ParseError(TypeError):
     pass
 
 
-def sqlalchemy_type(type: Type) -> Type[sqlalchemy.types.TypeEngine]:
+def sqlalchemy_type(type_: Type) -> Type[sqlalchemy.types.TypeEngine]:
     """
     Convert a Python type to a SQLAlchemy type.
 
-    :param type: A Python type
+    :param type_: A Python type
     :return: The corresponding SQLAlchemy type
     """
-    if type == int:
+    if type_ == int:
         return sqlalchemy.Integer
-    elif type == float:
+    elif type_ == float:
         return sqlalchemy.Float
-    elif type == str:
+    elif type_ == str:
         return sqlalchemy.String
-    elif type == bool:
+    elif type_ == bool:
         return sqlalchemy.Boolean
     else:
-        raise ValueError(f"Could not parse type {type}.")
+        raise ValueError(f"Could not parse type {type_}.")
 
 
 def is_builtin_class(clazz: Type):
@@ -122,6 +122,10 @@ class ORMatic:
         base_fields = [f for base in bases if is_dataclass(base) for f in fields(base)]
 
         # add inheritance structure
+        subclasses = list(set(self.class_dict.keys()) & set(wrapped_table.clazz.__subclasses__()))
+
+        if len(subclasses) > 0:
+            ...
 
         for field in fields(wrapped_table.clazz):
             self.parse_field(wrapped_table, field, base_fields)
@@ -241,6 +245,11 @@ class WrappedTable:
     primary_key_name: str = "id"
     """
     The name of the primary key column.
+    """
+
+    polymorphic_on_name: str = "polymorphic_type"
+    """
+    The name of the column that will be used to identify polymorphic identities if any present.
     """
 
     def __post_init__(self):

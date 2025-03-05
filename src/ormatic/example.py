@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
-
-from typing_extensions import Union, Optional, List
+from typing_extensions import List, Self
 
 
 @dataclass
@@ -18,16 +17,18 @@ class Orientation:
     z: float
     w: float
 
+
 @dataclass
 class Pose:
     position: Position
-    orientation:  Orientation
+    orientation: Orientation
+
 
 @dataclass
 class Positions:
     positions: List[Position]
-    # some_strings: List[str] array are not postgresql only :(
+    # some_strings: List[str] array are postgresql only :(
+
 
 class Position4D(Position):
     w: float
-
