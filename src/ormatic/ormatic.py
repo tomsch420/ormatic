@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import typing
-from dataclasses import dataclass, Field, fields
+from dataclasses import dataclass, Field, fields, is_dataclass
 from functools import cached_property
 from typing import Any
 
@@ -117,10 +117,17 @@ class ORMatic:
         Parse a single class.
         :param wrapped_table: The WrappedTable object to parse
         """
-        for field in fields(wrapped_table.clazz):
-            self.parse_field(wrapped_table, field)
 
-    def parse_field(self, wrapped_table: WrappedTable, field: Field):
+        bases = wrapped_table.clazz.__bases__
+        base_fields = [f for base in bases if is_dataclass(base) for f in fields(base)]
+
+        # add inheritance structure
+
+        for field in fields(wrapped_table.clazz):
+            self.parse_field(wrapped_table, field, base_fields)
+
+
+    def parse_field(self, wrapped_table: WrappedTable, field: Field, skip_fields: List[Field]):
         """
         Parse a single field.
         :param wrapped_table: The WrappedTable object to parse
@@ -128,6 +135,11 @@ class ORMatic:
         """
         print("=" * 80)
         print(field)
+
+        # skip inherited fields
+        if field in skip_fields:
+            return
+
         if field.name.startswith("_"):
             print("private")
             return
@@ -145,7 +157,7 @@ class ORMatic:
         """
         Create a one-to-one relationship between two tables.
         The relationship is created using a ForeignKey column and a relationship property on `wrapped_table` and
-         a relationship property on the `field.type` table. TODO Second part
+         a relationship property on the `field.type` table. TODO Second part or think if this is nescessary
 
         :param wrapped_table: The table that the relationship will be created on
         :param field: The field that the relationship will be created for
@@ -180,29 +192,25 @@ class ORMatic:
     def create_one_to_many_relationship(self, wrapped_table: WrappedTable, field: Field, inner_type: Type):
         """
         Create a one-to-many relationship between two tables.
-        The relationship is created using a ForeignKey column in `inner_type` and a relationship property on both tables.
-        TODO this is not working correctly yet.
+        The relationship is created using a ForeignKey column in `inner_type` and a relationship property on both
+        tables.
 
         :param wrapped_table: The "one" side of the relationship.
         :param field: The "many" side of the relationship.
         :param inner_type: The type of the elements in the iterable
         """
-        other_wrapped_table = self.class_dict[inner_type]
+        child_wrapped_table = self.class_dict[inner_type]
 
         # add a foreign key to the other table describing this table
         fk = sqlalchemy.Column(wrapped_table.foreign_key_name + self.foreign_key_postfix, Integer,
-                               sqlalchemy.ForeignKey(
-                                   f"{other_wrapped_table.tablename}.{other_wrapped_table.primary_key_name}"),
+                               sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
                                nullable=True)
-        other_wrapped_table.columns.append(fk)
+        child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
         wrapped_table.properties[field.name] = sqlalchemy.orm.relationship(inner_type,
-                                                                           back_populates=wrapped_table.tablename)
-
-        # add a relationship to the other table holding the object of this table
-        other_wrapped_table.properties[wrapped_table.tablename] = sqlalchemy.orm.relationship(wrapped_table.clazz,
-                                                                                              backref=other_wrapped_table.tablename)
+                                                                           #back_populates=wrapped_table.foreign_key_name,
+                                                                           default_factory=get_origin(field.type))
 
 
 @dataclass

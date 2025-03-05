@@ -24,7 +24,10 @@ class Pose:
     orientation:  Orientation
 
 @dataclass
-class Poses:
-    poses: List[Pose]
-    some_strings: List[str]
+class Positions:
+    positions: List[Position]
+    # some_strings: List[str] array are not postgresql only :(
+
+class Position4D(Position):
+    w: float
 

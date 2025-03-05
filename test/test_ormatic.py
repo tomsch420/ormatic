@@ -1,6 +1,8 @@
+import functools
 import os
 import tempfile
 import unittest
+from typing import Generic, TypeVar, ParamSpec
 
 import networkx as nx
 from pylint import run_pyreverse, run_pylint
@@ -8,6 +10,8 @@ from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, s
 from sqlalchemy.orm import registry, Session
 
 import subprocess
+
+from typing_extensions import Type
 
 import ormatic.example
 from ormatic.example import *
@@ -47,6 +51,7 @@ class DependencyGraphTestCase(unittest.TestCase):
         # session.commit()
 
         result = session.scalars(select(Position)).first()
+
 
 class ORMaticTestCase(unittest.TestCase):
 
@@ -115,16 +120,56 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(queried_pose1, pose1)
 
 
-    # def test_one_to_many(self):
-    #     return
-    #     classes = [Position, Orientation, Pose, Poses]
-    #     result = ORMatic(classes, self.mapper_registry)
-    #
-    #     poses_table = result.class_dict[Poses].make_table
-    #     pose_table = result.class_dict[Pose].make_table
-    #
-    #     foreign_keys = pose_table.foreign_keys
-    #     self.assertEqual(len(foreign_keys), 3)
+    def test_one_to_many(self):
+        classes = [Position, Positions]
+        result = ORMatic(classes, self.mapper_registry)
+        result.make_all_tables()
+
+        positions_table = result.class_dict[Positions].make_table
+        position_table = result.class_dict[Position].make_table
+
+        foreign_keys = position_table.foreign_keys
+        self.assertEqual(len(foreign_keys), 1)
+
+        self.assertEqual(len(positions_table.columns), 1)
+
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        p1 = Position(x=1, y=2, z=3)
+        p2 = Position(x=2, y=3, z=4)
+
+        positions = Positions([p1, p2])
+
+        self.session.add(positions)
+        self.session.commit()
+
+        positions = self.session.scalars(select(Positions)).one()
+        self.assertEqual(positions.positions, [p1, p2])
+
+    def test_inheritance(self):
+        classes = [Position, Position4D]
+        result = ORMatic(classes, self.mapper_registry)
+        result.make_all_tables()
+
+        position4d_table = result.class_dict[Position4D].make_table
+        position_table = result.class_dict[Position].make_table
+
+        foreign_keys = position4d_table.foreign_keys
+        self.assertEqual(len(foreign_keys), 1)
+        self.assertEqual(len(position4d_table.columns), 2)
+
+        # assert position table polymorphic identity
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        p1 = Position(x=1, y=2, z=3)
+        p2 = Position4D(x=2, y=3, z=4, w=2)
+
+        self.session.add_all([p1, p2])
+        self.session.commit()
+
+        queried_p1, queried_p2 = self.session.scalars(select(Position)).all()
+        print(queried_p1, queried_p2)
+
 
 
 if __name__ == '__main__':
