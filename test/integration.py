@@ -6,10 +6,10 @@ from orm_interface import *
 
 engine = create_engine('sqlite:///:memory:')
 session = Session(engine)
+mapper_registry.metadata.create_all(engine)
+
 
 p1 = Pose(position=Position(x=1, y=2, z=3), orientation=Orientation(x=1, y=2, z=3, w=4))
-
-mapper_registry.metadata.create_all(engine)
 
 session.add(p1)
 session.commit()
