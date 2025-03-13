@@ -1,18 +1,9 @@
-import functools
 import logging
-import os
 import sys
-import tempfile
 import unittest
 
-import networkx as nx
-from pylint import run_pyreverse, run_pylint
-from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, select, inspect, ARRAY
+from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, select
 from sqlalchemy.orm import registry, Session, clear_mappers
-
-import subprocess
-
-from typing_extensions import Type
 
 import ormatic.example
 from ormatic.example import *
@@ -20,7 +11,6 @@ from ormatic.ormatic import ORMatic
 
 
 class DependencyGraphTestCase(unittest.TestCase):
-
     session: Session
     mapper_registry: registry
 
@@ -59,7 +49,6 @@ class DependencyGraphTestCase(unittest.TestCase):
 
 
 class ORMaticTestCase(unittest.TestCase):
-
     session: Session
     mapper_registry: registry
 
@@ -80,8 +69,8 @@ class ORMaticTestCase(unittest.TestCase):
         result = ORMatic(classes, self.mapper_registry)
 
         self.assertEqual(len(result.class_dict), 2)
-        position_table = result.class_dict[Position].make_table
-        orientation_table = result.class_dict[Orientation].make_table
+        position_table = result.class_dict[Position].mapped_table
+        orientation_table = result.class_dict[Orientation].mapped_table
 
         self.assertEqual(len(position_table.columns), 4)
         self.assertEqual(len(orientation_table.columns), 5)
@@ -105,7 +94,7 @@ class ORMaticTestCase(unittest.TestCase):
         classes = [Position, Orientation, Pose]
         result = ORMatic(classes, self.mapper_registry)
         all_tables = result.make_all_tables()
-        pose_table = result.class_dict[Pose].make_table
+        pose_table = result.class_dict[Pose].mapped_table.local_table
 
         # get foreign keys of pose_table
         foreign_keys = pose_table.foreign_keys
@@ -128,14 +117,14 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(queried_o1, o1)
         self.assertEqual(queried_pose1, pose1)
 
-
     def test_one_to_many(self):
         classes = [Position, Positions]
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
 
-        positions_table = result.class_dict[Positions].make_table
-        position_table = result.class_dict[Position].make_table
+        positions_table = result.class_dict[Positions].mapped_table.local_table
+        print((positions_table))
+        position_table = result.class_dict[Position].mapped_table.local_table
 
         foreign_keys = position_table.foreign_keys
         self.assertEqual(len(foreign_keys), 1)
@@ -160,8 +149,8 @@ class ORMaticTestCase(unittest.TestCase):
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
 
-        position4d_table = result.class_dict[Position4D].make_table
-        position_table = result.class_dict[Position].make_table
+        position4d_table = result.class_dict[Position4D].mapped_table
+        position_table = result.class_dict[Position].mapped_table
 
         # foreign_keys = position4d_table.foreign_keys
         # self.assertEqual(len(foreign_keys), 1)
@@ -176,10 +165,9 @@ class ORMaticTestCase(unittest.TestCase):
         self.session.add_all([p1, p2])
         self.session.commit()
 
-        queried_p1 = self.session.scalars(select(Position)).first()
-        print("queried_p1", queried_p1)
+        queried_p1 = self.session.scalars(select(Position)).all()
+        self.assertEqual(queried_p1, [p1, p2])
         queried_p2 = self.session.scalars(select(Position4D)).first()
-        print("queried_p2", queried_p2)
         print(isinstance(queried_p2, Position))
 
 

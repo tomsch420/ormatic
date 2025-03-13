@@ -14,4 +14,4 @@ Features (TODO):
 - Inheritance using Joint Table Inheritance.
 - Support for enums.
 - Support for many-many relationships.
-- 
+- No multiple inheritance.

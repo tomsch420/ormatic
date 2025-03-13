@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import networkx as nx
+from tomlkit import integer
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 import typing
-from dataclasses import dataclass, Field, fields, is_dataclass
+
+from dataclasses import dataclass, Field, fields, is_dataclass, field
 from functools import cached_property
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import Table, Integer, ARRAY, Column
-from sqlalchemy.orm import relationship, registry, polymorphic_union
-from typing_extensions import List, Type, Dict, get_origin
+from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey
+from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper
+from typing_extensions import List, Type, Dict, get_origin, Optional
 import logging
 logger = logging.getLogger(__name__)
 
@@ -97,10 +105,32 @@ class ORMatic:
     Dictionary that maps the polymorphic identifier to the table in inheritance structures.
     """
 
+    inheritance_diagram: nx.DiGraph
+
     def __init__(self, classes: List[Type], mapper_registry: registry):
         self.class_dict = {}
+
+        self.inheritance_diagram = nx.DiGraph()
+
         for clazz in classes:
-            self.class_dict[clazz] = WrappedTable(clazz, [], {}, mapper_registry)
+
+            # get the inheritance tree
+            bases = [base for base in clazz.__bases__ if base in classes]
+            if len(bases) > 1:
+                raise ParseError(f"Multiple inheritance is not supported. {clazz} has multiple mapped bases: {bases}")
+
+            base = self.class_dict[bases[0]] if bases else None
+
+            wrapped_table = WrappedTable(clazz, [], {}, mapper_registry, parent_class=base)
+
+            self.class_dict[clazz] = wrapped_table
+            self.inheritance_diagram.add_node(wrapped_table)
+
+            # add the class to the subclasses of the base class
+            if base:
+                base.subclasses.append(wrapped_table)
+                self.inheritance_diagram.add_edge(base, wrapped_table)
+
         self.mapper_registry = mapper_registry
         self.polymorphic_union = {}
         self.parse_classes()
@@ -111,7 +141,7 @@ class ORMatic:
 
         :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
         """
-        return {wrapped_table.clazz: wrapped_table.make_table for wrapped_table in self.class_dict.values()}
+        return {wrapped_table.clazz: wrapped_table.mapped_table for wrapped_table in self.class_dict.values()}
 
     def parse_classes(self):
         """
@@ -126,32 +156,22 @@ class ORMatic:
         :param wrapped_table: The WrappedTable object to parse
         """
 
-        bases = wrapped_table.clazz.__bases__
+        # if this table is the root of a non-empty inheritance structure
+        if wrapped_table.is_root_of_non_empty_inheritance_structure:
 
-        base_fields = [f for base in bases if is_dataclass(base) for f in fields(base)]
-
-        if len(bases) > 0 and (base in self.class_dict for base in bases):
-            wrapped_table.has_parent_class = True
-
-        # add inheritance structure
-        subclasses = list(set(self.class_dict.keys()) & set(wrapped_table.clazz.__subclasses__()))
-
-        if len(subclasses) > 0:
-            wrapped_table.has_subclasses = True
+            # add a column for the polymorphic type to this table
             wrapped_table.columns.append(Column(wrapped_table.polymorphic_on_name, sqlalchemy.String))
-            wrapped_table.polymorphic_union = self.generate_polymorphic_union()
 
         for field in fields(wrapped_table.clazz):
-            self.parse_field(wrapped_table, field, base_fields)
+            self.parse_field(wrapped_table, field, skip_fields=(fields(wrapped_table.parent_class.clazz)
+                                                                if wrapped_table.parent_class else []))
 
     def generate_polymorphic_union(self):
         for wrapped_table in self.class_dict.values():
-            if wrapped_table.has_parent_class:
-                self.polymorphic_union[wrapped_table.tablename] = wrapped_table.make_table
+            if wrapped_table.has_parent_classes:
+                self.polymorphic_union[wrapped_table.tablename] = wrapped_table.mapped_table
 
         return polymorphic_union(self.polymorphic_union, "type")
-
-
 
     def parse_field(self, wrapped_table: WrappedTable, field: Field, skip_fields: List[Field]):
         """
@@ -279,20 +299,24 @@ class WrappedTable:
     The polymorphic union object that will be created if the class has subclasses.
     """
 
-    has_subclasses: bool = False
+    subclasses: List[WrappedTable] = field(default_factory=list)
     """
-    Indicates if this tables class has subclasses.
-    """
-
-    has_parent_class: bool = False
-    """
-    Indicates if the tables class has a parent that is mapped.
+    A list of subclasses as Wrapped Tables of the class that this WrappedTable wraps.
     """
 
-    def __post_init__(self):
-        pk_column = Column(self.primary_key_name,
-                           sqlalchemy.Integer, primary_key=True, autoincrement=True)
-        self.columns.append(pk_column)
+    parent_class: Optional[WrappedTable] = None
+    """
+    The parent class of self.clazz if it exists.
+    """
+
+    @property
+    def primary_key(self):
+        if self.parent_class:
+            column_type = ForeignKey(self.parent_class.full_primary_key_name)
+        else:
+            column_type = Integer
+
+        return Column(self.primary_key_name, column_type, primary_key=True)
 
     @property
     def tablename(self):
@@ -306,34 +330,47 @@ class WrappedTable:
     def foreign_key_name(self):
         return self.tablename.lower()
 
-    @cached_property
-    def make_table(self):
-        """
-        :return: The SQLAlchemy table created from the dataclass. Call this after all columns and relationships have been
-        added to the WrappedTable.
-        """
+    @property
+    def has_subclasses(self):
+        return len(self.subclasses) > 0
 
+    @property
+    def is_root_of_non_empty_inheritance_structure(self):
+        return self.has_subclasses and self.parent_class
+
+    @property
+    def mapper_kwargs(self):
         kwargs = {
             "properties": self.properties
         }
 
         if self.has_subclasses:
-            table = Table(
-                self.polymorphic_union,
-                self.mapper_registry.metadata,
-                *self.columns)
-            kwargs["polymorphic_on"] = self.polymorphic_union.c.type
-            kwargs["with_polymorphic"] = ("*", self.polymorphic_union)
-        else:
-            table = Table(
-                self.tablename,
-                self.mapper_registry.metadata,
-                *self.columns, )
-
-        if self.has_parent_class:
+            kwargs["polymorphic_on"] = self.polymorphic_on_name
             kwargs["polymorphic_identity"] = self.tablename
+        if self.parent_class:
+            kwargs["polymorphic_identity"] = self.tablename
+            kwargs["inherits"] = self.parent_class.mapped_table
 
-        self.mapper_registry.map_imperatively(self.clazz, table, **kwargs)
+        return kwargs
+
+    @cached_property
+    def mapped_table(self) -> Mapper:
+        """
+        :return: The SQLAlchemy table created from the dataclass. Call this after all columns and relationships have been
+        added to the WrappedTable.
+        """
+
+        columns = [self.primary_key] + self.columns
+        if self.has_subclasses:
+            columns.append(Column(self.polymorphic_on_name, sqlalchemy.String))
+
+        table = Table(
+            self.tablename,
+            self.mapper_registry.metadata,
+            *columns,
+        )
+
+        table = self.mapper_registry.map_imperatively(self.clazz, table, **self.mapper_kwargs)
         return table
 
     def parse_builtin_type(self, field: Field):
@@ -342,3 +379,7 @@ class WrappedTable:
         :param field: The field to parse
         """
         self.columns.append(column_of_field(field))
+
+
+    def __hash__(self):
+        return hash(self.clazz)
