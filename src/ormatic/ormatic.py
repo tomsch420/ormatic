@@ -7,7 +7,7 @@ from typing import Any
 
 import sqlalchemy
 from sqlalchemy import Table, Integer, ARRAY, Column
-from sqlalchemy.orm import relationship, registry
+from sqlalchemy.orm import relationship, registry, polymorphic_union
 from typing_extensions import List, Type, Dict, get_origin
 
 
@@ -90,11 +90,17 @@ class ORMatic:
     The postfix that will be added to foreign key columns (not the relationships).
     """
 
+    polymorphic_union: Dict[str, Table]
+    """
+    Dictionary that maps the polymorphic identifier to the table in inheritance structures.
+    """
+
     def __init__(self, classes: List[Type], mapper_registry: registry):
         self.class_dict = {}
         for clazz in classes:
             self.class_dict[clazz] = WrappedTable(clazz, [], {}, mapper_registry)
         self.mapper_registry = mapper_registry
+        self.polymorphic_union = {}
         self.parse_classes()
 
     def make_all_tables(self) -> Dict[Type, Table]:
@@ -119,16 +125,29 @@ class ORMatic:
         """
 
         bases = wrapped_table.clazz.__bases__
+
         base_fields = [f for base in bases if is_dataclass(base) for f in fields(base)]
+
+        if len(bases) > 0 and (base in self.class_dict for base in bases):
+            wrapped_table.has_parent_class = True
 
         # add inheritance structure
         subclasses = list(set(self.class_dict.keys()) & set(wrapped_table.clazz.__subclasses__()))
 
         if len(subclasses) > 0:
-            ...
+            wrapped_table.has_subclasses = True
+            wrapped_table.columns.append(Column(wrapped_table.polymorphic_on_name, sqlalchemy.String))
+            wrapped_table.polymorphic_union = self.generate_polymorphic_union()
 
         for field in fields(wrapped_table.clazz):
             self.parse_field(wrapped_table, field, base_fields)
+
+    def generate_polymorphic_union(self):
+        for wrapped_table in self.class_dict.values():
+            if wrapped_table.has_parent_class:
+                self.polymorphic_union[wrapped_table.tablename] = wrapped_table.make_table
+
+        return polymorphic_union(self.polymorphic_union, "type")
 
 
     def parse_field(self, wrapped_table: WrappedTable, field: Field, skip_fields: List[Field]):
@@ -252,6 +271,21 @@ class WrappedTable:
     The name of the column that will be used to identify polymorphic identities if any present.
     """
 
+    polymorphic_union = None
+    """
+    The polymorphic union object that will be created if the class has subclasses.
+    """
+
+    has_subclasses: bool = False
+    """
+    Indicates if this tables class has subclasses.
+    """
+
+    has_parent_class: bool = False
+    """
+    Indicates if the tables class has a parent that is mapped.
+    """
+
     def __post_init__(self):
         pk_column = Column(self.primary_key_name,
                            sqlalchemy.Integer, primary_key=True, autoincrement=True)
@@ -275,11 +309,28 @@ class WrappedTable:
         :return: The SQLAlchemy table created from the dataclass. Call this after all columns and relationships have been
         added to the WrappedTable.
         """
-        table = Table(
-            self.tablename,
-            self.mapper_registry.metadata,
-            *self.columns, )
-        self.mapper_registry.map_imperatively(self.clazz, table, properties=self.properties)
+
+        kwargs = {
+            "properties": self.properties
+        }
+
+        if self.has_subclasses:
+            table = Table(
+                self.polymorphic_union,
+                self.mapper_registry.metadata,
+                *self.columns)
+            kwargs["polymorphic_on"] = self.polymorphic_union.c.type
+            kwargs["with_polymorphic"] = ("*", self.polymorphic_union)
+        else:
+            table = Table(
+                self.tablename,
+                self.mapper_registry.metadata,
+                *self.columns, )
+
+        if self.has_parent_class:
+            kwargs["polymorphic_identity"] = self.tablename
+
+        self.mapper_registry.map_imperatively(self.clazz, table, **kwargs)
         return table
 
     def parse_builtin_type(self, field: Field):

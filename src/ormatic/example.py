@@ -29,6 +29,6 @@ class Positions:
     positions: List[Position]
     # some_strings: List[str] array are postgresql only :(
 
-
+@dataclass
 class Position4D(Position):
     w: float
