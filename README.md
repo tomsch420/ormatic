@@ -10,8 +10,7 @@ When designing the dataclasses there are a couple of rules that need to be follo
 If you want an optional iterable, use an empty iterable instead.
 
 Features (TODO):
-- Write table definitions to a file such that on import the tables are mapped with the classes.
-- Inheritance using Joint Table Inheritance.
+- Optional Types 
 - Support for enums.
 - Support for many-many relationships.
 - No multiple inheritance.
