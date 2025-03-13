@@ -1,12 +1,14 @@
 import functools
+import logging
 import os
+import sys
 import tempfile
 import unittest
 
 import networkx as nx
 from pylint import run_pyreverse, run_pylint
 from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, select, inspect, ARRAY
-from sqlalchemy.orm import registry, Session
+from sqlalchemy.orm import registry, Session, clear_mappers
 
 import subprocess
 
@@ -27,6 +29,10 @@ class DependencyGraphTestCase(unittest.TestCase):
         engine = create_engine('sqlite:///:memory:')
         self.session = Session(engine)
 
+    def tearDown(self):
+        self.mapper_registry.metadata.drop_all(self.session.bind)
+        clear_mappers()
+        self.session.close()
 
     def test_position(self):
         mapper_registry = registry()
@@ -58,12 +64,16 @@ class ORMaticTestCase(unittest.TestCase):
     mapper_registry: registry
 
     def setUp(self):
+        ormatic.ormatic.logger.setLevel(logging.DEBUG)
+        ormatic.ormatic.logger.addHandler(logging.StreamHandler(sys.stdout))
         self.mapper_registry = registry()
         engine = create_engine('sqlite:///:memory:')
         self.session = Session(engine)
 
     def tearDown(self):
         self.mapper_registry.metadata.drop_all(self.session.bind)
+        clear_mappers()
+        self.session.close()
 
     def test_no_dependencies(self):
         classes = [Position, Orientation]

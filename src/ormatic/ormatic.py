@@ -9,6 +9,8 @@ import sqlalchemy
 from sqlalchemy import Table, Integer, ARRAY, Column
 from sqlalchemy.orm import relationship, registry, polymorphic_union
 from typing_extensions import List, Type, Dict, get_origin
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ParseError(TypeError):
@@ -46,7 +48,7 @@ def is_builtin_class(clazz: Type):
     :param clazz: The class to check
     :return: True if the class is a builtin class, False otherwise
     """
-    return clazz.__module__ == 'builtins'
+    return clazz.__module__ == 'builtins' and not is_iterable(clazz)
 
 
 def column_of_field(field: Field) -> sqlalchemy.Column:
@@ -150,30 +152,31 @@ class ORMatic:
         return polymorphic_union(self.polymorphic_union, "type")
 
 
+
     def parse_field(self, wrapped_table: WrappedTable, field: Field, skip_fields: List[Field]):
         """
         Parse a single field.
         :param wrapped_table: The WrappedTable object to parse
         :param field: The field to parse
         """
-        print("=" * 80)
-        print(field)
 
         # skip inherited fields
         if field in skip_fields:
             return
 
         if field.name.startswith("_"):
-            print("private")
+            logger.info(f"Skipping {wrapped_table.clazz.__name__}.{field.name} because it starts with an underscore.")
             return
         elif is_builtin_class(field.type):
-            print("builtin type")
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} as builtin type.")
             wrapped_table.parse_builtin_type(field)
         elif field.type in self.class_dict:
-            print("class type")
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} "
+                        f"as one to one relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
             self.create_one_to_one_relationship(wrapped_table, field)
         elif is_iterable(field.type):
-            print("iterable")
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} "
+                        f"as one to many relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
             self.parse_iterable_field(wrapped_table, field)
 
     def create_one_to_one_relationship(self, wrapped_table: WrappedTable, field: Field):
