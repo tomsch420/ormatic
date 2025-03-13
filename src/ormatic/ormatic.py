@@ -16,7 +16,7 @@ from sqlacodegen.utils import render_callable
 from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey
 from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper, Relationship
 from sqlalchemy.orm.relationships import _RelationshipDeclared, RelationshipProperty
-from typing_extensions import List, Type, Dict, get_origin, Optional
+from typing_extensions import List, Type, Dict, get_origin, Optional, get_type_hints
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def is_builtin_class(clazz: Type):
     :param clazz: The class to check
     :return: True if the class is a builtin class, False otherwise
     """
-    return clazz.__module__ == 'builtins' and not is_iterable(clazz)
+    return not is_iterable(clazz) and clazz.__module__ == 'builtins'
 
 
 def column_of_field(field: Field) -> sqlalchemy.Column:
@@ -184,18 +184,20 @@ class ORMatic:
         if field in skip_fields:
             return
 
+        type_hint = get_type_hints(wrapped_table.clazz)[field.name]
+
         if field.name.startswith("_"):
             logger.info(f"Skipping {wrapped_table.clazz.__name__}.{field.name} because it starts with an underscore.")
             return
-        elif is_builtin_class(field.type):
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} as builtin type.")
+        elif is_builtin_class(type_hint):
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} as builtin type.")
             wrapped_table.parse_builtin_type(field)
-        elif field.type in self.class_dict:
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} "
+        elif type_hint in self.class_dict:
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} "
                         f"as one to one relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
             self.create_one_to_one_relationship(wrapped_table, field)
-        elif is_iterable(field.type):
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {field.type} "
+        elif is_iterable(type_hint):
+            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} "
                         f"as one to many relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
             self.parse_iterable_field(wrapped_table, field)
 
