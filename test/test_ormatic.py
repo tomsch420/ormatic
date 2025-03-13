@@ -2,6 +2,7 @@ import logging
 import sys
 import unittest
 
+import sqlacodegen.generators
 from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, select
 from sqlalchemy.orm import registry, Session, clear_mappers
 
@@ -53,8 +54,11 @@ class ORMaticTestCase(unittest.TestCase):
     mapper_registry: registry
 
     def setUp(self):
-        ormatic.ormatic.logger.setLevel(logging.DEBUG)
-        ormatic.ormatic.logger.addHandler(logging.StreamHandler(sys.stdout))
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        ormatic.ormatic.logger.addHandler(handler)
+        ormatic.ormatic.logger.setLevel(logging.INFO)
+
         self.mapper_registry = registry()
         engine = create_engine('sqlite:///:memory:')
         self.session = Session(engine)
@@ -166,8 +170,25 @@ class ORMaticTestCase(unittest.TestCase):
         queried_p1 = self.session.scalars(select(Position)).all()
         self.assertEqual(queried_p1, [p1, p2])
         queried_p2 = self.session.scalars(select(Position4D)).first()
-        print(isinstance(queried_p2, Position))
+        self.assertIsInstance(queried_p2, Position)
 
+
+    def test_all_together(self):
+        classes = [Position, Orientation, Pose, Position4D, Positions]
+        result = ORMatic(classes, self.mapper_registry)
+        result.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+    def test_to_python_file(self):
+        classes = [Position, Orientation, Pose, Position4D, Positions]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        generator = sqlacodegen.generators.TablesGenerator(self.mapper_registry.metadata, self.session.bind, [])
+
+        with open('orm_interface.py', 'w') as f:
+            ormatic.to_python_file(generator, f)
 
 if __name__ == '__main__':
     unittest.main()

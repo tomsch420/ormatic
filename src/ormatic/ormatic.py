@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
 import networkx as nx
-from tomlkit import integer
 
-if TYPE_CHECKING:
-    from _typeshed import DataclassInstance
 import typing
 
-from dataclasses import dataclass, Field, fields, is_dataclass, field
+from dataclasses import dataclass, Field, fields, field
 from functools import cached_property
 from typing import Any
 
+import sqlacodegen.generators
 import sqlalchemy
+from sqlacodegen.utils import render_callable
 from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey
-from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper
+from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper, Relationship
+from sqlalchemy.orm.relationships import _RelationshipDeclared, RelationshipProperty
 from typing_extensions import List, Type, Dict, get_origin, Optional
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,7 +159,6 @@ class ORMatic:
 
         # if this table is the root of a non-empty inheritance structure
         if wrapped_table.is_root_of_non_empty_inheritance_structure:
-
             # add a column for the polymorphic type to this table
             wrapped_table.columns.append(Column(wrapped_table.polymorphic_on_name, sqlalchemy.String))
 
@@ -255,8 +255,35 @@ class ORMatic:
 
         # add a relationship to this table holding the list of objects from the field.type table
         wrapped_table.properties[field.name] = sqlalchemy.orm.relationship(inner_type,
-                                                                           #back_populates=wrapped_table.foreign_key_name,
+                                                                           # back_populates=wrapped_table.foreign_key_name,
                                                                            default_factory=get_origin(field.type))
+
+    def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
+
+        #write imports
+        # collect imports
+        imports = {clazz.__module__ for clazz in self.class_dict.keys()}
+        for import_ in imports:
+            file.write(f"import {import_}\n")
+
+        file.write("from sqlalchemy.orm import registry, relationship \n")
+
+        # write tables
+        file.write(generator.generate())
+
+        # add registry
+        file.write("\n")
+        file.write("mapper_registry = registry(metadata=metadata)\n")
+
+        for wrapped_table in self.class_dict.values():
+            file.write("\n")
+
+            parsed_kwargs = wrapped_table.mapper_kwargs_for_python_file
+
+            file.write(f"m_{wrapped_table.tablename} = mapper_registry."
+                       f"map_imperatively({wrapped_table.clazz.__module__}.{wrapped_table.clazz.__name__}, "
+                       f"t_{wrapped_table.tablename}, {parsed_kwargs})\n")
+
 
 
 @dataclass
@@ -353,6 +380,35 @@ class WrappedTable:
 
         return kwargs
 
+    @property
+    def mapper_kwargs_for_python_file(self) -> str:
+        result = {}
+        properties = {}
+        for name, relation in self.properties.items():
+            relation: RelationshipProperty
+
+            relation_argument = relation.argument
+
+            if isinstance(relation.argument, type):
+                relation_argument = relation.argument.__name__
+                properties[name] = f"relationship(\"{relation_argument}\", default_factory=list)"
+            else:
+                properties[name] = f"relationship(\"{relation_argument}\")"
+
+        if properties:
+            result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"
+
+        if self.has_subclasses:
+            result["polymorphic_on"] = f"\"{self.polymorphic_on_name}\""
+            result["polymorphic_identity"] = f"\"{self.tablename}\""
+        if self.parent_class:
+            result["polymorphic_identity"] = f"\"{self.tablename}\""
+            result["inherits"] = f"m_{self.parent_class.tablename}"
+
+        result = ", ".join(f"{key} = {value}" for key, value in result.items())
+        return result
+
+
     @cached_property
     def mapped_table(self) -> Mapper:
         """
@@ -379,7 +435,6 @@ class WrappedTable:
         :param field: The field to parse
         """
         self.columns.append(column_of_field(field))
-
 
     def __hash__(self):
         return hash(self.clazz)

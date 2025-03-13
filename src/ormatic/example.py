@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from typing_extensions import List, Self
+from typing_extensions import List
 
 
 @dataclass
