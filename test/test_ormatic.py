@@ -123,7 +123,6 @@ class ORMaticTestCase(unittest.TestCase):
         result.make_all_tables()
 
         positions_table = result.class_dict[Positions].mapped_table.local_table
-        print((positions_table))
         position_table = result.class_dict[Position].mapped_table.local_table
 
         foreign_keys = position_table.foreign_keys
@@ -149,12 +148,11 @@ class ORMaticTestCase(unittest.TestCase):
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
 
-        position4d_table = result.class_dict[Position4D].mapped_table
-        position_table = result.class_dict[Position].mapped_table
+        position4d_table = result.class_dict[Position4D].mapped_table.local_table
 
-        # foreign_keys = position4d_table.foreign_keys
-        # self.assertEqual(len(foreign_keys), 1)
-        # self.assertEqual(len(position4d_table.columns), 2)
+        foreign_keys = position4d_table.foreign_keys
+        self.assertEqual(len(foreign_keys), 1)
+        self.assertEqual(len(position4d_table.columns), 2)
 
         # assert position table polymorphic identity
         self.mapper_registry.metadata.create_all(self.session.bind)
