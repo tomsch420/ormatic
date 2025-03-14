@@ -8,7 +8,7 @@ from typing import TextIO
 
 import sqlacodegen.generators
 import sqlalchemy
-from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey
+from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
 from sqlalchemy.orm.relationships import RelationshipProperty
 from typing_extensions import List, Type, Dict, Optional
@@ -89,12 +89,6 @@ class ORMatic:
 
         :param wrapped_table: The WrappedTable object to parse
         """
-
-        # if this table is the root of a non-empty inheritance structure
-        if wrapped_table.is_root_of_non_empty_inheritance_structure:
-            # add a column for the polymorphic type to this table
-            wrapped_table.columns.append(Column(wrapped_table.polymorphic_on_name, sqlalchemy.String))
-
         for f in fields(wrapped_table.clazz):
 
             if wrapped_table.parent_class and f in fields(wrapped_table.parent_class.clazz):
@@ -161,7 +155,9 @@ class ORMatic:
             self.create_one_to_many_relationship(wrapped_table, field_info)
 
         elif field_info.is_container_of_builtin:
-            column = sqlalchemy.Column(field_info.name, ARRAY(sqlalchemy_type(field_info.type)))
+            # TODO: store lists of builtins not as JSON, e. g
+            #  column = sqlalchemy.Column(field_info.name, ARRAY(sqlalchemy_type(field_info.type)))
+            column = sqlalchemy.Column(field_info.name, JSON)
             wrapped_table.columns.append(column)
 
         else:
@@ -293,7 +289,7 @@ class WrappedTable:
 
     @property
     def is_root_of_non_empty_inheritance_structure(self):
-        return self.has_subclasses and self.parent_class
+        return self.has_subclasses and not self.parent_class
 
     @property
     def mapper_kwargs(self):
@@ -301,10 +297,10 @@ class WrappedTable:
             "properties": self.properties
         }
 
-        if self.has_subclasses:
+        if self.is_root_of_non_empty_inheritance_structure:
             kwargs["polymorphic_on"] = self.polymorphic_on_name
             kwargs["polymorphic_identity"] = self.tablename
-        if self.parent_class:
+        elif self.parent_class:
             kwargs["polymorphic_identity"] = self.tablename
             kwargs["inherits"] = self.parent_class.mapped_table
 
@@ -328,7 +324,7 @@ class WrappedTable:
         if properties:
             result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"
 
-        if self.has_subclasses:
+        if self.is_root_of_non_empty_inheritance_structure:
             result["polymorphic_on"] = f"\"{self.polymorphic_on_name}\""
             result["polymorphic_identity"] = f"\"{self.tablename}\""
         if self.parent_class:
@@ -346,7 +342,7 @@ class WrappedTable:
         """
 
         columns = [self.primary_key] + self.columns
-        if self.has_subclasses:
+        if self.is_root_of_non_empty_inheritance_structure:
             columns.append(Column(self.polymorphic_on_name, sqlalchemy.String))
 
         table = Table(

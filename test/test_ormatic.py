@@ -132,7 +132,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(positions.positions, [p1, p2])
 
     def test_inheritance(self):
-        classes = [Position, Position4D]
+        classes = [Position, Position4D, Position5D]
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
 

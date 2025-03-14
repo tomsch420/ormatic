@@ -37,6 +37,10 @@ class Positions:
 class Position4D(Position):
     w: float
 
+@dataclass
+class Position5D(Position):
+    a: float
+
 
 class ValueEnum(int, Enum):
     A = 1
