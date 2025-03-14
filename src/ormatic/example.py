@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from typing_extensions import List
+from typing_extensions import List, Optional
 
 
 @dataclass
@@ -15,7 +15,7 @@ class Orientation:
     x: float
     y: float
     z: float
-    w: float
+    w: Optional[float]
 
 
 @dataclass

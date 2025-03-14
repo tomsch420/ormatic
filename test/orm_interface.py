@@ -8,9 +8,9 @@ metadata = MetaData()
 t_Orientation = Table(
     'Orientation', metadata,
     Column('id', Integer, primary_key=True),
-    Column('x', Float),
-    Column('y', Float),
-    Column('z', Float),
+    Column('x', Float, nullable=False),
+    Column('y', Float, nullable=False),
+    Column('z', Float, nullable=False),
     Column('w', Float)
 )
 
@@ -22,9 +22,9 @@ t_Positions = Table(
 t_Position = Table(
     'Position', metadata,
     Column('id', Integer, primary_key=True),
-    Column('x', Float),
-    Column('y', Float),
-    Column('z', Float),
+    Column('x', Float, nullable=False),
+    Column('y', Float, nullable=False),
+    Column('z', Float, nullable=False),
     Column('positions_id', ForeignKey('Positions.id')),
     Column('polymorphic_type', String)
 )
@@ -39,7 +39,7 @@ t_Pose = Table(
 t_Position4D = Table(
     'Position4D', metadata,
     Column('id', ForeignKey('Position.id'), primary_key=True),
-    Column('w', Float)
+    Column('w', Float, nullable=False)
 )
 
 mapper_registry = registry(metadata=metadata)

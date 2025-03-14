@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import NoneType
 from typing import TYPE_CHECKING, TextIO
 
 import networkx as nx
@@ -18,66 +19,10 @@ from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper, Re
 from sqlalchemy.orm.relationships import _RelationshipDeclared, RelationshipProperty
 from typing_extensions import List, Type, Dict, get_origin, Optional, get_type_hints
 import logging
+from .field_info import ParseError, FieldInfo, sqlalchemy_type
 
 logger = logging.getLogger(__name__)
 
-
-class ParseError(TypeError):
-    """
-    Error that will be raised when the parser encounters something that can/should not be parsed.
-
-    For instance, Union types
-    """
-    pass
-
-
-def sqlalchemy_type(type_: Type) -> Type[sqlalchemy.types.TypeEngine]:
-    """
-    Convert a Python type to a SQLAlchemy type.
-
-    :param type_: A Python type
-    :return: The corresponding SQLAlchemy type
-    """
-    if type_ == int:
-        return sqlalchemy.Integer
-    elif type_ == float:
-        return sqlalchemy.Float
-    elif type_ == str:
-        return sqlalchemy.String
-    elif type_ == bool:
-        return sqlalchemy.Boolean
-    else:
-        raise ValueError(f"Could not parse type {type_}.")
-
-
-def is_builtin_class(clazz: Type):
-    """
-    Check if a class is a builtin class.
-
-    :param clazz: The class to check
-    :return: True if the class is a builtin class, False otherwise
-    """
-    return not is_iterable(clazz) and clazz.__module__ == 'builtins'
-
-
-def column_of_field(field: Field) -> sqlalchemy.Column:
-    """
-    Create a SQLAlchemy column from a dataclass field.
-
-    :param field: The field to create a column from
-    :return: The created column
-    """
-    return sqlalchemy.Column(field.name, sqlalchemy_type(field.type))
-
-
-def is_iterable(clazz: Type) -> bool:
-    """
-    Check if a class is an iterable.
-
-    :param clazz: The class to check
-    :return: True if the class is an iterable, False otherwise
-    """
-    return get_origin(clazz) in [list, set, tuple]
 
 
 class ORMatic:
@@ -136,7 +81,7 @@ class ORMatic:
         self.polymorphic_union = {}
         self.parse_classes()
 
-    def make_all_tables(self) -> Dict[Type, Table]:
+    def make_all_tables(self) -> Dict[Type, Mapper]:
         """
         Create all the SQLAlchemy tables from the classes in the class_dict.
 
@@ -166,88 +111,83 @@ class ORMatic:
             self.parse_field(wrapped_table, field, skip_fields=(fields(wrapped_table.parent_class.clazz)
                                                                 if wrapped_table.parent_class else []))
 
-    def generate_polymorphic_union(self):
-        for wrapped_table in self.class_dict.values():
-            if wrapped_table.has_parent_classes:
-                self.polymorphic_union[wrapped_table.tablename] = wrapped_table.mapped_table
-
-        return polymorphic_union(self.polymorphic_union, "type")
-
-    def parse_field(self, wrapped_table: WrappedTable, field: Field, skip_fields: List[Field]):
+    def parse_field(self, wrapped_table: WrappedTable, f: Field, skip_fields: List[Field]):
         """
         Parse a single field.
         :param wrapped_table: The WrappedTable object to parse
-        :param field: The field to parse
+        :param f: The field to parse
         """
 
         # skip inherited fields
-        if field in skip_fields:
+        if f in skip_fields:
             return
 
-        type_hint = get_type_hints(wrapped_table.clazz)[field.name]
+        logger.info("=" * 80)
+        logger.info(f"Processing Field {wrapped_table.clazz.__name__}{f.name}: {f.type}.")
 
-        if field.name.startswith("_"):
-            logger.info(f"Skipping {wrapped_table.clazz.__name__}.{field.name} because it starts with an underscore.")
+        field_info = FieldInfo(wrapped_table.clazz, f)
+
+        if f.name.startswith("_"):
+            logger.info(f"Skipping.")
             return
-        elif is_builtin_class(type_hint):
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} as builtin type.")
-            wrapped_table.parse_builtin_type(field)
-        elif type_hint in self.class_dict:
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} "
-                        f"as one to one relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
-            self.create_one_to_one_relationship(wrapped_table, field)
-        elif is_iterable(type_hint):
-            logger.info(f"Parsing {wrapped_table.clazz.__name__}.{field.name} of type {type_hint} "
-                        f"as one to many relationship. The foreign key is constructed on {wrapped_table.clazz.__name__}.")
-            self.parse_iterable_field(wrapped_table, field)
+        elif field_info.is_builtin_class:
+            logger.info(f"Parsing as builtin type.")
+            wrapped_table.columns.append(field_info.column)
+        elif not field_info.container and field_info.type in self.class_dict:
+            logger.info(f"Parsing as one to one relationship.")
+            self.create_one_to_one_relationship(wrapped_table, field_info)
+        elif field_info.container:
+            logger.info(f"Parsing as one to many relationship.")
+            self.parse_container_field(wrapped_table, field_info)
+        else:
+            logger.info("Skipping due to not handled type.")
 
-    def create_one_to_one_relationship(self, wrapped_table: WrappedTable, field: Field):
+    def create_one_to_one_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
         Create a one-to-one relationship between two tables.
         The relationship is created using a ForeignKey column and a relationship property on `wrapped_table` and
-         a relationship property on the `field.type` table. TODO Second part or think if this is nescessary
+         a relationship property on the `field.type` table.
 
         :param wrapped_table: The table that the relationship will be created on
-        :param field: The field that the relationship will be created for
+        :param field_info: The field that the relationship will be created for
         """
-        other_wrapped_table = self.class_dict[field.type]
+        other_wrapped_table = self.class_dict[field_info.type]
 
         # create foreign key to field.type
-        fk = sqlalchemy.Column(field.name + self.foreign_key_postfix, Integer,
+        fk = sqlalchemy.Column(field_info.name + self.foreign_key_postfix, Integer,
                                sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name), nullable=True)
         wrapped_table.columns.append(fk)
 
-        wrapped_table.properties[field.name] = sqlalchemy.orm.relationship(other_wrapped_table.tablename)
+        wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(other_wrapped_table.tablename)
 
-    def parse_iterable_field(self, wrapped_table: WrappedTable, field: Field):
+    def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
         Parse an iterable field and create a one to many relationship if needed.
+
         :param wrapped_table: The table that the relationship will be created on
-        :param field: The field to parse
+        :param field_info: The field to parse
         """
-        inner_type = typing.get_args(field.type)[0]
 
-        if is_builtin_class(inner_type):
-            column = sqlalchemy.Column(field.name, ARRAY(sqlalchemy_type(inner_type)))
+        if field_info.type in self.class_dict:
+            self.create_one_to_many_relationship(wrapped_table, field_info)
+
+        elif field_info.is_container_of_builtin:
+            column = sqlalchemy.Column(field_info.name, ARRAY(sqlalchemy_type(field_info.type)))
             wrapped_table.columns.append(column)
-
-        elif inner_type in self.class_dict:
-            self.create_one_to_many_relationship(wrapped_table, field, inner_type)
 
         else:
             raise ParseError(f"Could not parse iterable field {field}")
 
-    def create_one_to_many_relationship(self, wrapped_table: WrappedTable, field: Field, inner_type: Type):
+    def create_one_to_many_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
         Create a one-to-many relationship between two tables.
         The relationship is created using a ForeignKey column in `inner_type` and a relationship property on both
         tables.
 
         :param wrapped_table: The "one" side of the relationship.
-        :param field: The "many" side of the relationship.
-        :param inner_type: The type of the elements in the iterable
+        :param field_info: The "many" side of the relationship.
         """
-        child_wrapped_table = self.class_dict[inner_type]
+        child_wrapped_table = self.class_dict[field_info.type]
 
         # add a foreign key to the other table describing this table
         fk = sqlalchemy.Column(wrapped_table.foreign_key_name + self.foreign_key_postfix, Integer,
@@ -256,9 +196,9 @@ class ORMatic:
         child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
-        wrapped_table.properties[field.name] = sqlalchemy.orm.relationship(inner_type,
+        wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(field_info.type,
                                                                            # back_populates=wrapped_table.foreign_key_name,
-                                                                           default_factory=get_origin(field.type))
+                                                                           default_factory=field_info.container)
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
 
@@ -430,13 +370,6 @@ class WrappedTable:
 
         table = self.mapper_registry.map_imperatively(self.clazz, table, **self.mapper_kwargs)
         return table
-
-    def parse_builtin_type(self, field: Field):
-        """
-        Add a column for a field with a builtin type.
-        :param field: The field to parse
-        """
-        self.columns.append(column_of_field(field))
 
     def __hash__(self):
         return hash(self.clazz)

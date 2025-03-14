@@ -3,50 +3,12 @@ import sys
 import unittest
 
 import sqlacodegen.generators
-from sqlalchemy import Table, MetaData, Column, Integer, Float, create_engine, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import registry, Session, clear_mappers
 
 import ormatic.example
 from ormatic.example import *
 from ormatic.ormatic import ORMatic
-
-
-class DependencyGraphTestCase(unittest.TestCase):
-    session: Session
-    mapper_registry: registry
-
-    def setUp(self):
-        self.mapper_registry = registry()
-        engine = create_engine('sqlite:///:memory:')
-        self.session = Session(engine)
-
-    def tearDown(self):
-        self.mapper_registry.metadata.drop_all(self.session.bind)
-        clear_mappers()
-        self.session.close()
-
-    def test_position(self):
-        mapper_registry = registry()
-        metadata_obj = MetaData()
-        position_table = Table(
-            'position', metadata_obj,
-            Column('id', Integer, primary_key=True),
-            Column('x', Float),
-            Column('y', Float),
-            Column('z', Float),
-        )
-
-        mapper_registry.map_imperatively(Position, position_table)
-
-        p = Position(x=1, y=2, z=3)
-
-        engine = create_engine('sqlite:///:memory:')
-        metadata_obj.create_all(engine)
-        session = Session(engine)
-        session.add(p)
-        # session.commit()
-
-        result = session.scalars(select(Position)).first()
 
 
 class ORMaticTestCase(unittest.TestCase):
@@ -79,8 +41,11 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(len(position_table.columns), 4)
         self.assertEqual(len(orientation_table.columns), 5)
 
+        orientation_colum = [c for c in orientation_table.columns if c.name == 'w'][0]
+        self.assertTrue(orientation_colum.nullable)
+
         p1 = Position(x=1, y=2, z=3)
-        o1 = Orientation(x=1, y=2, z=3, w=1)
+        o1 = Orientation(x=1, y=2, z=3, w=None)
 
         # create all tables
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -172,7 +137,6 @@ class ORMaticTestCase(unittest.TestCase):
         queried_p2 = self.session.scalars(select(Position4D)).first()
         self.assertIsInstance(queried_p2, Position)
 
-
     def test_all_together(self):
         classes = [Position, Orientation, Pose, Position4D, Positions]
         result = ORMatic(classes, self.mapper_registry)
@@ -189,6 +153,7 @@ class ORMaticTestCase(unittest.TestCase):
 
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
+
 
 if __name__ == '__main__':
     unittest.main()
