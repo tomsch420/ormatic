@@ -20,6 +20,7 @@ Features:
 - Support for optional fields.
 - Support for nested dataclasses.
 - Support for many-many relationships (TODO).
+- Support for self-referencing relationships (TODO).
 
 ## Example
 
