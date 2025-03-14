@@ -59,6 +59,25 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(queried_p1, p1)
         self.assertEqual(queried_o1, o1)
 
+    def test_enum_parse(self):
+        classes = [EnumContainer]
+        result = ORMatic(classes, self.mapper_registry)
+        result.make_all_tables()
+
+        enum_container_table = result.class_dict[EnumContainer].mapped_table.local_table
+
+        self.assertEqual(len(enum_container_table.columns), 2)
+        self.assertEqual(len(enum_container_table.foreign_keys), 0)
+
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        enum_container = EnumContainer(value=ValueEnum.A)
+        self.session.add(enum_container)
+        self.session.commit()
+
+        queried_enum_container = self.session.scalars(select(EnumContainer)).one()
+        self.assertEqual(queried_enum_container, enum_container)
+
     def test_one_to_one_relationships(self):
         classes = [Position, Orientation, Pose]
         result = ORMatic(classes, self.mapper_registry)
@@ -138,13 +157,13 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertIsInstance(queried_p2, Position)
 
     def test_all_together(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions]
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer]
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions]
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer]
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)

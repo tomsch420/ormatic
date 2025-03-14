@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import typing
 from dataclasses import dataclass, Field
 from functools import cached_property
@@ -85,7 +86,14 @@ class FieldInfo:
 
     @cached_property
     def column(self) -> Column:
-        return Column(self.name, sqlalchemy_type(self.type), nullable=self.optional)
+        if self.is_enum:
+            return Column(self.name, sqlalchemy.Enum(self.type), nullable=self.optional)
+        else:
+            return Column(self.name, sqlalchemy_type(self.type), nullable=self.optional)
+
+    @property
+    def is_enum(self):
+        return issubclass(self.type, enum.Enum)
 
 
 def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:

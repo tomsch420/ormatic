@@ -7,10 +7,9 @@ When designing the dataclasses there are a couple of rules that need to be follo
 - Fields that are not mapped start with an `_` (underscore).
 - The only allowed union is the `Optional[_T]` union. Whenever you want a union of other types, use inheritance instead.
 - Iterables are never optional and never nested. 
-If you want an optional iterable, use an empty iterable instead.
+If you want an optional iterable, use an empty iterable as default factory instead.
 
-Features (TODO):
-- Optional Types 
+Features (TODO): 
 - Support for enums.
 - Support for many-many relationships.
 - No multiple inheritance.

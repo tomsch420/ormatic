@@ -118,7 +118,7 @@ class ORMatic:
         if f.name.startswith("_"):
             logger.info(f"Skipping.")
             return
-        elif field_info.is_builtin_class:
+        elif field_info.is_builtin_class or field_info.is_enum:
             logger.info(f"Parsing as builtin type.")
             wrapped_table.columns.append(field_info.column)
         elif not field_info.container and field_info.type in self.class_dict:
@@ -191,13 +191,13 @@ class ORMatic:
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
 
-        # write imports
-        # collect imports
-        imports = {clazz.__module__ for clazz in self.class_dict.keys()}
-        for import_ in imports:
-            file.write(f"import {import_}\n")
+        # monkeypatch the render_column_type method to handle Enum types better
+        generator.render_column_type_old = generator.render_column_type
+        generator.render_column_type = render_enum_aware_column_type.__get__(generator, sqlacodegen.generators.TablesGenerator)
 
-        file.write("from sqlalchemy.orm import registry, relationship \n")
+        # collect imports
+        generator.module_imports |= {clazz.__module__ for clazz in self.class_dict.keys()}
+        generator.imports["sqlalchemy.orm"] = {"registry", "relationship"}
 
         # write tables
         file.write(generator.generate())
@@ -360,3 +360,18 @@ class WrappedTable:
 
     def __hash__(self):
         return hash(self.clazz)
+
+
+def render_enum_aware_column_type(self: sqlacodegen.generators.TablesGenerator, coltype: object) -> str:
+    """
+    Render a column type, handling Enum types as imported enums.
+    This is a drop in replacement for the TablesGenerator.render_column_type method.
+
+    :param self: The TablesGenerator instance
+    :param coltype: The column type to render
+    :return: The rendered column type
+    """
+    if not isinstance(coltype, sqlalchemy.Enum):
+        return self.render_column_type_old(coltype)
+    return f"Enum({coltype.python_type.__module__}.{coltype.python_type.__name__})"
+

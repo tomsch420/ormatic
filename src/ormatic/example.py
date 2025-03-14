@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 from typing_extensions import List, Optional
 
@@ -32,3 +33,13 @@ class Positions:
 @dataclass
 class Position4D(Position):
     w: float
+
+
+class ValueEnum(int, Enum):
+    A = 1
+    B = 2
+    C = 3
+
+@dataclass
+class EnumContainer:
+    value: ValueEnum
