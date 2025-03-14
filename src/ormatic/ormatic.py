@@ -1,33 +1,26 @@
 from __future__ import annotations
 
-from types import NoneType
-from typing import TYPE_CHECKING, TextIO
-
-import networkx as nx
-
-import typing
-
+import logging
 from dataclasses import dataclass, Field, fields, field
 from functools import cached_property
 from typing import Any
+from typing import TextIO
 
 import sqlacodegen.generators
 import sqlalchemy
-from sqlacodegen.utils import render_callable
 from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey
-from sqlalchemy.orm import relationship, registry, polymorphic_union, Mapper, Relationship
-from sqlalchemy.orm.relationships import _RelationshipDeclared, RelationshipProperty
-from typing_extensions import List, Type, Dict, get_origin, Optional, get_type_hints
-import logging
+from sqlalchemy.orm import relationship, registry, Mapper
+from sqlalchemy.orm.relationships import RelationshipProperty
+from typing_extensions import List, Type, Dict, Optional
+
 from .field_info import ParseError, FieldInfo, sqlalchemy_type
 
 logger = logging.getLogger(__name__)
 
 
-
 class ORMatic:
     """
-    ORMatic is a tool for generating SQLAlchemy ORM models from dataclasses.
+    ORMatic is a tool for generating SQLAlchemy ORM models from a set of dataclasses.
     """
 
     mapper_registry: registry
@@ -51,12 +44,8 @@ class ORMatic:
     Dictionary that maps the polymorphic identifier to the table in inheritance structures.
     """
 
-    inheritance_diagram: nx.DiGraph
-
     def __init__(self, classes: List[Type], mapper_registry: registry):
         self.class_dict = {}
-
-        self.inheritance_diagram = nx.DiGraph()
 
         for clazz in classes:
 
@@ -70,12 +59,10 @@ class ORMatic:
             wrapped_table = WrappedTable(clazz, [], {}, mapper_registry, parent_class=base)
 
             self.class_dict[clazz] = wrapped_table
-            self.inheritance_diagram.add_node(wrapped_table)
 
             # add the class to the subclasses of the base class
             if base:
                 base.subclasses.append(wrapped_table)
-                self.inheritance_diagram.add_edge(base, wrapped_table)
 
         self.mapper_registry = mapper_registry
         self.polymorphic_union = {}
@@ -99,6 +86,7 @@ class ORMatic:
     def parse_class(self, wrapped_table: WrappedTable):
         """
         Parse a single class.
+
         :param wrapped_table: The WrappedTable object to parse
         """
 
@@ -107,20 +95,20 @@ class ORMatic:
             # add a column for the polymorphic type to this table
             wrapped_table.columns.append(Column(wrapped_table.polymorphic_on_name, sqlalchemy.String))
 
-        for field in fields(wrapped_table.clazz):
-            self.parse_field(wrapped_table, field, skip_fields=(fields(wrapped_table.parent_class.clazz)
-                                                                if wrapped_table.parent_class else []))
+        for f in fields(wrapped_table.clazz):
 
-    def parse_field(self, wrapped_table: WrappedTable, f: Field, skip_fields: List[Field]):
+            if wrapped_table.parent_class and f in fields(wrapped_table.parent_class.clazz):
+                continue
+
+            self.parse_field(wrapped_table, f)
+
+    def parse_field(self, wrapped_table: WrappedTable, f: Field):
         """
         Parse a single field.
-        :param wrapped_table: The WrappedTable object to parse
+
+        :param wrapped_table: The WrappedTable object where the field is in the clazz attribute
         :param f: The field to parse
         """
-
-        # skip inherited fields
-        if f in skip_fields:
-            return
 
         logger.info("=" * 80)
         logger.info(f"Processing Field {wrapped_table.clazz.__name__}{f.name}: {f.type}.")
@@ -145,7 +133,8 @@ class ORMatic:
     def create_one_to_one_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
         Create a one-to-one relationship between two tables.
-        The relationship is created using a ForeignKey column and a relationship property on `wrapped_table` and
+
+        The relationship is created using a foreign key column and a relationship property on `wrapped_table` and
          a relationship property on the `field.type` table.
 
         :param wrapped_table: The table that the relationship will be created on
@@ -162,7 +151,7 @@ class ORMatic:
 
     def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
-        Parse an iterable field and create a one to many relationship if needed.
+        Parse an iterable field and create a one-to-many relationship if needed.
 
         :param wrapped_table: The table that the relationship will be created on
         :param field_info: The field to parse
@@ -181,8 +170,8 @@ class ORMatic:
     def create_one_to_many_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
         Create a one-to-many relationship between two tables.
-        The relationship is created using a ForeignKey column in `inner_type` and a relationship property on both
-        tables.
+        The relationship is created using a foreign key column on `field_info.type` and a
+        relationship property on `WrappedTable.clazz`.
 
         :param wrapped_table: The "one" side of the relationship.
         :param field_info: The "many" side of the relationship.
@@ -197,12 +186,12 @@ class ORMatic:
 
         # add a relationship to this table holding the list of objects from the field.type table
         wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(field_info.type,
-                                                                           # back_populates=wrapped_table.foreign_key_name,
-                                                                           default_factory=field_info.container)
+                                                                                # back_populates=wrapped_table.foreign_key_name,
+                                                                                default_factory=field_info.container)
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
 
-        #write imports
+        # write imports
         # collect imports
         imports = {clazz.__module__ for clazz in self.class_dict.keys()}
         for import_ in imports:
@@ -225,7 +214,6 @@ class ORMatic:
             file.write(f"m_{wrapped_table.tablename} = mapper_registry."
                        f"map_imperatively({wrapped_table.clazz.__module__}.{wrapped_table.clazz.__name__}, "
                        f"t_{wrapped_table.tablename}, {parsed_kwargs})\n")
-
 
 
 @dataclass
@@ -349,7 +337,6 @@ class WrappedTable:
 
         result = ", ".join(f"{key} = {value}" for key, value in result.items())
         return result
-
 
     @cached_property
     def mapped_table(self) -> Mapper:

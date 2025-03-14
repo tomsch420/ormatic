@@ -37,17 +37,17 @@ class FieldInfo:
 
     type: Type
     """
-    The type of the field or inner type of the container.
+    The type of the field or inner type of the container if it is a container.
     """
 
     optional: bool
     """
-    True if the type is optional, False otherwise.
+    True if the field is optional, False otherwise.
     """
 
     container: Optional[Type]
     """
-    The type of the container if it is one (list, set, tuple),.
+    The type of the container if it is one (list, set, tuple, etc.).
     """
 
     def __init__(self, clazz: Type, f: Field):
@@ -57,6 +57,7 @@ class FieldInfo:
         type_hints = get_type_hints(clazz)[self.name]
         type_args = typing.get_args(type_hints)
 
+        # try to unpack the type if it is a nested type
         if len(type_args) > 0:
             if len(type_args) > 2:
                 raise ParseError(f"Could not parse field {f}. Too many type arguments.")
@@ -75,15 +76,15 @@ class FieldInfo:
             self.type = f.type
 
     @property
-    def is_builtin_class(self):
+    def is_builtin_class(self) -> bool:
         return not self.container and self.type.__module__ == 'builtins'
 
     @property
-    def is_container_of_builtin(self):
+    def is_container_of_builtin(self) -> bool:
         return self.container and self.type.__module__ == 'builtins'
 
     @cached_property
-    def column(self):
+    def column(self) -> Column:
         return Column(self.name, sqlalchemy_type(self.type), nullable=self.optional)
 
 
