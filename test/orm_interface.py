@@ -11,6 +11,12 @@ t_EnumContainer = Table(
     Column('value', Enum(ormatic.example.ValueEnum), nullable=False)
 )
 
+t_Node = Table(
+    'Node', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('parent_id', ForeignKey('Node.id'))
+)
+
 t_Orientation = Table(
     'Orientation', metadata,
     Column('id', Integer, primary_key=True),
@@ -62,3 +68,5 @@ m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Po
 m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", default_factory=list)))
 
 m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
+
+m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship("Node")))

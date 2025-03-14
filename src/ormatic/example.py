@@ -1,4 +1,6 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from enum import Enum
 
 from typing_extensions import List, Optional
@@ -30,6 +32,7 @@ class Positions:
     positions: List[Position]
     # some_strings: List[str] array are postgresql only :(
 
+
 @dataclass
 class Position4D(Position):
     w: float
@@ -40,6 +43,12 @@ class ValueEnum(int, Enum):
     B = 2
     C = 3
 
+
 @dataclass
 class EnumContainer:
     value: ValueEnum
+
+
+@dataclass
+class Node:
+    parent: Optional[Node] = None

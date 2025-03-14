@@ -111,7 +111,7 @@ class ORMatic:
         """
 
         logger.info("=" * 80)
-        logger.info(f"Processing Field {wrapped_table.clazz.__name__}{f.name}: {f.type}.")
+        logger.info(f"Processing Field {wrapped_table.clazz.__name__}.{f.name}: {f.type}.")
 
         field_info = FieldInfo(wrapped_table.clazz, f)
 

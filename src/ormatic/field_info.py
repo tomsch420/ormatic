@@ -68,13 +68,13 @@ class FieldInfo:
             if self.optional:
                 self.container = None
             else:
-                self.container = get_origin(f.type)
+                self.container = get_origin(type_hints)
 
             self.type = type_args[0]
         else:
             self.optional = False
             self.container = None
-            self.type = f.type
+            self.type = type_hints
 
     @property
     def is_builtin_class(self) -> bool:

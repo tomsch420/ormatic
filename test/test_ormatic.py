@@ -156,6 +156,30 @@ class ORMaticTestCase(unittest.TestCase):
         queried_p2 = self.session.scalars(select(Position4D)).first()
         self.assertIsInstance(queried_p2, Position)
 
+    def test_tree_structure(self):
+        classes = [Node]
+        result = ORMatic(classes, self.mapper_registry)
+        result.make_all_tables()
+
+        node_table = result.class_dict[Node].mapped_table.local_table
+
+        foreign_keys = node_table.foreign_keys
+
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        n1 = Node()
+        n2 = Node(parent=n1)
+        n3 = Node(parent=n1)
+
+        self.session.add_all([n1, n2, n3])
+        self.session.commit()
+
+        results = self.session.scalars(select(Node)).all()
+        n1, n2, n3 = results
+        self.assertIsNone(n1.parent)
+        self.assertEqual(n2.parent, n1)
+        self.assertEqual(n3.parent, n1)
+
     def test_all_together(self):
         classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer]
         result = ORMatic(classes, self.mapper_registry)
@@ -163,7 +187,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer]
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node]
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
