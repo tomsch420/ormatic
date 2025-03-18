@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ormatic"
+authors = [
+    { name="Tom Schierenbeck", email="tom_sch@uni-bremen.de" },
+
+]
+description = "Automatic Creation of ORM Models from Python Dataclasses."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords=["ORM", "sqlalchemy", "dataclasses", "database", "models", "automatic"]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Source" = 'https://github.com/tomsch420/ormatic'
+"Bug Tracker" = 'https://github.com/tomsch420/ormatic/issues'
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+include = ["ormatic*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ormatic.__version__"}
+dependencies = {file = "requirements.txt"}
