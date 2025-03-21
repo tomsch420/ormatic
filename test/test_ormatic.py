@@ -167,17 +167,19 @@ class ORMaticTestCase(unittest.TestCase):
 
         self.mapper_registry.metadata.create_all(self.session.bind)
 
+        n0 = Node()
         n1 = Node()
         n2 = Node(parent=n1)
         n3 = Node(parent=n1)
+        nmult = Node(parent=[n0, n1])
 
-        self.session.add_all([n1, n2, n3])
+        self.session.add_all([n1, n2, nmult, n3])
         self.session.commit()
 
         results = self.session.scalars(select(Node)).all()
-        n1, n2, n3 = results
+        n1, n2, nmult, n3 = results
         self.assertIsNone(n1.parent)
-        self.assertEqual(n2.parent, n1)
+        self.assertEqual(nmult.parent, [n0, n1])
         self.assertEqual(n3.parent, n1)
 
     def test_all_together(self):

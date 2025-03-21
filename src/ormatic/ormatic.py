@@ -10,7 +10,7 @@ import sqlacodegen.generators
 import sqlalchemy
 from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
-from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.orm.relationships import RelationshipProperty, remote, foreign
 from typing_extensions import List, Type, Dict, Optional
 
 from .field_info import ParseError, FieldInfo, sqlalchemy_type
@@ -141,7 +141,13 @@ class ORMatic:
                                sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name), nullable=True)
         wrapped_table.columns.append(fk)
 
-        wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(other_wrapped_table.tablename)
+        if wrapped_table.clazz == other_wrapped_table.clazz:
+            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
+                wrapped_table.tablename,
+                remote_side=[wrapped_table.primary_key],
+                foreign_keys=[wrapped_table.mapped_table.c.parent_id],)
+        else:
+            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(other_wrapped_table.tablename)
 
     def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
