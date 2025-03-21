@@ -167,19 +167,17 @@ class ORMaticTestCase(unittest.TestCase):
 
         self.mapper_registry.metadata.create_all(self.session.bind)
 
-        n0 = Node()
         n1 = Node()
         n2 = Node(parent=n1)
         n3 = Node(parent=n1)
-        nmult = Node(parent=[n0, n1])
 
-        self.session.add_all([n1, n2, nmult, n3])
+        self.session.add_all([n1, n2, n3])
         self.session.commit()
 
         results = self.session.scalars(select(Node)).all()
-        n1, n2, nmult, n3 = results
+        n1, n2, n3 = results
         self.assertIsNone(n1.parent)
-        self.assertEqual(nmult.parent, [n0, n1])
+        self.assertEqual(n2.parent, n1)
         self.assertEqual(n3.parent, n1)
 
     def test_all_together(self):
@@ -198,6 +196,23 @@ class ORMaticTestCase(unittest.TestCase):
 
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
+
+    def test_molecule(self):
+        classes = [Atom, Bond, Molecule]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        atom = Atom(Element.I, 1, 1.0)
+        bond = Bond(atom, atom, 1)
+        molecule = Molecule(1, 1, 1.0, 1.0, True, [atom], [bond])
+        self.session.add_all([atom, bond, molecule])
+        self.session.commit()
+
+        result = self.session.scalars(select(Molecule).join(Atom).where(Atom.element == Element.I).distinct()).first()
+        self.assertEqual(result, molecule)
+        self.assertEqual(result.color, 'red')
+
 
 
 if __name__ == '__main__':

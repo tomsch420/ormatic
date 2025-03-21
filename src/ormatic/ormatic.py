@@ -145,9 +145,11 @@ class ORMatic:
             wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
                 wrapped_table.tablename,
                 remote_side=[wrapped_table.primary_key],
-                foreign_keys=[wrapped_table.mapped_table.c.parent_id],)
+                foreign_keys=[wrapped_table.mapped_table.c.parent_id])
         else:
-            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(other_wrapped_table.tablename)
+            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
+                other_wrapped_table.tablename,
+                foreign_keys=[fk])
 
     def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
