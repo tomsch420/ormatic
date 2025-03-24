@@ -142,10 +142,11 @@ class ORMatic:
         wrapped_table.columns.append(fk)
 
         if wrapped_table.clazz == other_wrapped_table.clazz:
+            column_name = field_info.name + self.foreign_key_postfix
             wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
                 wrapped_table.tablename,
                 remote_side=[wrapped_table.primary_key],
-                foreign_keys=[wrapped_table.mapped_table.c.parent_id])
+                foreign_keys=[wrapped_table.mapped_table.c.get(column_name)])
         else:
             wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
                 other_wrapped_table.tablename,
