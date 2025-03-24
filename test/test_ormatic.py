@@ -197,6 +197,23 @@ class ORMaticTestCase(unittest.TestCase):
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
 
+    def test_molecule(self):
+        classes = [Atom, Bond, Molecule]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        atom = Atom(Element.I, 1, 1.0)
+        bond = Bond(atom, atom, 1)
+        molecule = Molecule(1, 1, 1.0, 1.0, True, [atom], [bond])
+        self.session.add_all([atom, bond, molecule])
+        self.session.commit()
+
+        result = self.session.scalars(select(Molecule).join(Atom).where(Atom.element == Element.I).distinct()).first()
+        self.assertEqual(result, molecule)
+        self.assertEqual(result.color, 'red')
+
+
 
 if __name__ == '__main__':
     unittest.main()
