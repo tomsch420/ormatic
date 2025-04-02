@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import typing
 from dataclasses import dataclass, Field
+from datetime import datetime
 from functools import cached_property
 from types import NoneType
 
@@ -95,6 +96,10 @@ class FieldInfo:
     def is_enum(self):
         return issubclass(self.type, enum.Enum)
 
+    @property
+    def is_datetime(self):
+        return self.type == datetime
+
 
 def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:
     """
@@ -111,6 +116,8 @@ def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:
         return sqlalchemy.String
     elif t == bool:
         return sqlalchemy.Boolean
+    elif t == datetime:
+        return sqlalchemy.DateTime
     else:
         raise ValueError(f"Could not parse type {t}.")
 

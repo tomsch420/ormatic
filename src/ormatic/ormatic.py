@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 from dataclasses import dataclass, Field, fields, field
 from functools import cached_property
@@ -13,7 +14,7 @@ from sqlalchemy.orm import relationship, registry, Mapper
 from sqlalchemy.orm.relationships import RelationshipProperty, remote, foreign
 from typing_extensions import List, Type, Dict, Optional
 
-from .field_info import ParseError, FieldInfo, sqlalchemy_type
+from .field_info import ParseError, FieldInfo
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,6 @@ class ORMatic:
         self.class_dict = {}
 
         for clazz in classes:
-
             # get the inheritance tree
             bases = [base for base in clazz.__bases__ if base in classes]
             if len(bases) > 1:
@@ -112,7 +112,7 @@ class ORMatic:
         if f.name.startswith("_"):
             logger.info(f"Skipping.")
             return
-        elif field_info.is_builtin_class or field_info.is_enum:
+        elif field_info.is_builtin_class or field_info.is_enum or field_info.is_datetime:
             logger.info(f"Parsing as builtin type.")
             wrapped_table.columns.append(field_info.column)
         elif not field_info.container and field_info.type in self.class_dict:
