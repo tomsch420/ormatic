@@ -326,9 +326,11 @@ class WrappedTable:
 
             if isinstance(relation.argument, type):
                 relation_argument = relation.argument.__name__
-                properties[name] = f"relationship(\"{relation_argument}\", default_factory=list)"
+                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], default_factory=list)"
+            elif relation_argument == self.tablename:
+                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], remote_side=[t_{self.tablename}.c.id])"
             else:
-                properties[name] = f"relationship(\"{relation_argument}\")"
+                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id])"
 
         if properties:
             result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"

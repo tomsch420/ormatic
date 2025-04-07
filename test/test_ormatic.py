@@ -161,10 +161,6 @@ class ORMaticTestCase(unittest.TestCase):
         result = ORMatic(classes, self.mapper_registry)
         result.make_all_tables()
 
-        node_table = result.class_dict[Node].mapped_table.local_table
-
-        foreign_keys = node_table.foreign_keys
-
         self.mapper_registry.metadata.create_all(self.session.bind)
 
         n1 = Node()
