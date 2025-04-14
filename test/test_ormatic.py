@@ -144,7 +144,6 @@ class ORMaticTestCase(unittest.TestCase):
 
         # assert position table polymorphic identity
         self.mapper_registry.metadata.create_all(self.session.bind)
-
         p1 = Position(x=1, y=2, z=3)
         p2 = Position4D(x=2, y=3, z=4, w=2)
 
@@ -208,6 +207,22 @@ class ORMaticTestCase(unittest.TestCase):
         result = self.session.scalars(select(Molecule).join(Atom).where(Atom.element == Element.I).distinct()).first()
         self.assertEqual(result, molecule)
         self.assertEqual(result.color, 'red')
+
+    def test_explicit_mappings(self):
+        classes = [PartialPosition]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        p1 = Position4D(x=1, y=2, z=0, w=0)
+        p2 = Position4D(x=2, y=3, z=0, w=0)
+        self.session.add_all([p1, p2])
+        self.session.commit()
+
+        result = self.session.scalars(select(Position4D)).all()
+        self.assertEqual(len(result), len([p1, p2]))
+        self.assertEqual(result, [p1, p2])
+
 
 
 

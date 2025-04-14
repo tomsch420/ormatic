@@ -5,6 +5,9 @@ from enum import Enum
 
 from typing_extensions import List, Optional
 
+from ormatic.ormatic import ORMaticExplicitMapping
+
+
 class Element(str, Enum):
     C = "c"
     H = "h"
@@ -48,6 +51,18 @@ class Positions:
 @dataclass
 class Position4D(Position):
     w: float
+
+
+@dataclass
+class PartialPosition(ORMaticExplicitMapping):
+    x: float
+    y: float
+    z: float
+
+    @classmethod
+    @property
+    def explicit_mapping(cls):
+        return Position4D
 
 
 @dataclass

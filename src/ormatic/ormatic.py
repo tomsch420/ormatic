@@ -19,6 +19,17 @@ from .field_info import ParseError, FieldInfo
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class ORMaticExplicitMapping:
+    """
+    Abstract class that is used to mark a class as an explicit mapping.
+    """
+
+    @classmethod
+    @property
+    def explicit_mapping(cls) -> Type:
+        raise NotImplementedError
+
 
 class ORMatic:
     """
@@ -52,6 +63,10 @@ class ORMatic:
     """
 
     def __init__(self, classes: List[Type], mapper_registry: registry):
+        """
+        :param classes: The list of classes to be mapped.
+        :param mapper_registry: The SQLAlchemy mapper registry. This is needed for the relationship configuration.
+        """
         self.class_dict = {}
 
         self.make_class_dependency_graph(classes)
@@ -214,12 +229,13 @@ class ORMatic:
                                                                                 default_factory=field_info.container)
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
-
         # monkeypatch the render_column_type method to handle Enum types better
         generator.render_column_type_old = generator.render_column_type
         generator.render_column_type = render_enum_aware_column_type.__get__(generator, sqlacodegen.generators.TablesGenerator)
 
         # collect imports
+        generator.module_imports |= {clazz.explicit_mapping.__module__ for clazz in self.class_dict.keys()
+                                     if issubclass(clazz, ORMaticExplicitMapping)}
         generator.module_imports |= {clazz.__module__ for clazz in self.class_dict.keys()}
         generator.imports["sqlalchemy.orm"] = {"registry", "relationship"}
 
@@ -234,9 +250,13 @@ class ORMatic:
             file.write("\n")
 
             parsed_kwargs = wrapped_table.mapper_kwargs_for_python_file
+            if issubclass(wrapped_table.clazz, ORMaticExplicitMapping):
+                key = wrapped_table.clazz.explicit_mapping
+            else:
+                key = wrapped_table.clazz
 
             file.write(f"m_{wrapped_table.tablename} = mapper_registry."
-                       f"map_imperatively({wrapped_table.clazz.__module__}.{wrapped_table.clazz.__name__}, "
+                       f"map_imperatively({key.__module__}.{key.__name__}, "
                        f"t_{wrapped_table.tablename}, {parsed_kwargs})\n")
 
 
@@ -381,7 +401,12 @@ class WrappedTable:
             *columns,
         )
 
-        table = self.mapper_registry.map_imperatively(self.clazz, table, **self.mapper_kwargs)
+        if issubclass(self.clazz, ORMaticExplicitMapping):
+            clazz = self.clazz.explicit_mapping
+        else:
+            clazz = self.clazz
+
+        table = self.mapper_registry.map_imperatively(clazz, table, **self.mapper_kwargs)
         return table
 
     def __hash__(self):
