@@ -60,13 +60,13 @@ m_Position = mapper_registry.map_imperatively(ormatic.example.Position, t_Positi
 
 m_Orientation = mapper_registry.map_imperatively(ormatic.example.Orientation, t_Orientation, )
 
-m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship("Position", foreign_keys=[t_Pose.c.position_id]), 
+m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship("Position", foreign_keys=[t_Pose.c.position_id]),
 orientation=relationship("Orientation", foreign_keys=[t_Pose.c.orientation_id])))
 
-m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)
-
-m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", foreign_keys=[t_Positions.c.positions_id], default_factory=list)))
+m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", default_factory=list)))
 
 m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
 
 m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship("Node", foreign_keys=[t_Node.c.parent_id], remote_side=[t_Node.c.id])))
+
+m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)

@@ -7,6 +7,7 @@ from functools import cached_property
 from typing import Any
 from typing import TextIO
 
+import networkx as nx
 import sqlacodegen.generators
 import sqlalchemy
 from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey, JSON
@@ -45,12 +46,19 @@ class ORMatic:
     Dictionary that maps the polymorphic identifier to the table in inheritance structures.
     """
 
+    class_dependency_graph: Optional[nx.DiGraph] = None
+    """
+    A direct acyclic graph containing the class hierarchy.
+    """
+
     def __init__(self, classes: List[Type], mapper_registry: registry):
         self.class_dict = {}
 
-        for clazz in classes:
+        self.make_class_dependency_graph(classes)
+
+        for clazz in nx.topological_sort(self.class_dependency_graph):
             # get the inheritance tree
-            bases = [base for base in clazz.__bases__ if base in classes]
+            bases: List[Type] = [base for (base, _) in self.class_dependency_graph.in_edges(clazz)]
             if len(bases) > 1:
                 raise ParseError(f"Multiple inheritance is not supported. {clazz} has multiple mapped bases: {bases}")
 
@@ -67,6 +75,17 @@ class ORMatic:
         self.mapper_registry = mapper_registry
         self.polymorphic_union = {}
         self.parse_classes()
+
+    def make_class_dependency_graph(self, classes: List[Type]):
+        self.class_dependency_graph = nx.DiGraph()
+
+        for clazz in classes:
+            self.class_dependency_graph.add_node(clazz)
+
+            for base in clazz.__bases__:
+                if base in classes:
+                    self.class_dependency_graph.add_edge(base, clazz)
+
 
     def make_all_tables(self) -> Dict[Type, Mapper]:
         """
