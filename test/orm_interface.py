@@ -63,10 +63,10 @@ m_Orientation = mapper_registry.map_imperatively(ormatic.example.Orientation, t_
 m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship("Position"), 
 orientation=relationship("Orientation")))
 
-m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)
-
 m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", default_factory=list)))
 
 m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
 
 m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship("Node")))
+
+m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)
