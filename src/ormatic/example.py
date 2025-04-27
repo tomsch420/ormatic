@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from typing_extensions import List, Optional
+from sqlalchemy import Column, types
+from typing_extensions import List, Optional, Type
 
-from ormatic.ormatic import ORMaticExplicitMapping
+from ormatic.utils import ORMaticExplicitMapping
 
 
 class Element(str, Enum):
@@ -116,3 +117,44 @@ class Molecule:
         if [a for a in self.atoms if a.element == Element.I]:
             return "red"
         return "green"
+
+
+class PhysicalObject:
+    pass
+
+
+class Cup(PhysicalObject):
+    pass
+
+
+class Bowl(PhysicalObject):
+    pass
+
+
+@dataclass
+class SimulatedObject:
+    concept: PhysicalObject
+
+
+class PhysicalObjectType(types.TypeDecorator):
+    """
+    This type represents a physical object type.
+    The database representation of this is a string while the in memory type is the instance of PhysicalObject.
+    """
+    cache_ok = True
+    impl = types.String
+
+    def process_bind_param(self, value, dialect):
+        return value.__class__.__name__
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        cls = globals().get(value)
+        if cls is not None and issubclass(cls, PhysicalObject):
+            return cls()
+        raise ValueError(f"Cannot map '{value}' to a PhysicalObject class.")
+
+    def copy(self, **kw):
+        return self.__class__(**kw)
+

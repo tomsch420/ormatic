@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import logging
 from dataclasses import dataclass, Field, fields, field
 from functools import cached_property
@@ -10,37 +9,15 @@ from typing import TextIO
 import networkx as nx
 import sqlacodegen.generators
 import sqlalchemy
-from sqlalchemy import Table, Integer, ARRAY, Column, ForeignKey, JSON
+from sqlalchemy import Table, Integer, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
-from sqlalchemy.orm.relationships import RelationshipProperty, remote, foreign
+from sqlalchemy.orm.relationships import RelationshipProperty
 from typing_extensions import List, Type, Dict, Optional
 
 from .field_info import ParseError, FieldInfo
+from .utils import ORMaticExplicitMapping
 
 logger = logging.getLogger(__name__)
-
-
-class classproperty:
-    """
-    A decorator that allows a class method to be accessed as a property.
-    """
-
-    def __init__(self, fget):
-        self.fget = fget
-
-    def __get__(self, instance, owner):
-        return self.fget(owner)
-
-
-@dataclass
-class ORMaticExplicitMapping:
-    """
-    Abstract class that is used to mark a class as an explicit mapping.
-    """
-
-    @classproperty
-    def explicit_mapping(cls) -> Type:
-        raise NotImplementedError
 
 
 class ORMatic:
@@ -74,7 +51,7 @@ class ORMatic:
     A direct acyclic graph containing the class hierarchy.
     """
 
-    def __init__(self, classes: List[Type], mapper_registry: registry):
+    def __init__(self, classes: List[Type], mapper_registry: registry, type_mappings: Dict[Type, Any] = None):
         """
         :param classes: The list of classes to be mapped.
         :param mapper_registry: The SQLAlchemy mapper registry. This is needed for the relationship configuration.
@@ -99,6 +76,7 @@ class ORMatic:
             if base:
                 base.subclasses.append(wrapped_table)
 
+        self.type_mappings = type_mappings or {}
         self.mapper_registry = mapper_registry
         self.polymorphic_union = {}
         self.parse_classes()
@@ -161,7 +139,7 @@ class ORMatic:
         elif field_info.is_builtin_class or field_info.is_enum or field_info.is_datetime:
             logger.info(f"Parsing as builtin type.")
             wrapped_table.columns.append(field_info.column)
-        elif not field_info.container and field_info.type in self.class_dict:
+        elif not field_info.container and (field_info.type in self.class_dict or field_info.type in self.type_mappings.keys()):
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(wrapped_table, field_info)
         elif field_info.container:
@@ -180,23 +158,31 @@ class ORMatic:
         :param wrapped_table: The table that the relationship will be created on
         :param field_info: The field that the relationship will be created for
         """
-        other_wrapped_table = self.class_dict[field_info.type]
-
-        # create foreign key to field.type
-        fk = sqlalchemy.Column(field_info.name + self.foreign_key_postfix, Integer,
-                               sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name), nullable=True)
+        # check if the field has a type that needs to be cast.
+        if field_info.type in self.type_mappings.keys():
+            other_wrapped_table = None
+            fk = sqlalchemy.Column(field_info.name, self.type_mappings[field_info.type], nullable=True)
+        else:
+            other_wrapped_table = self.class_dict[field_info.type]
+            # create foreign key to field.type
+            fk = sqlalchemy.Column(field_info.name + self.foreign_key_postfix, Integer,
+                                   sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name), nullable=True)
         wrapped_table.columns.append(fk)
 
-        if wrapped_table.clazz == other_wrapped_table.clazz:
-            column_name = field_info.name + self.foreign_key_postfix
-            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
-                wrapped_table.tablename,
-                remote_side=[wrapped_table.primary_key],
-                foreign_keys=[wrapped_table.mapped_table.c.get(column_name)])
+        # if the field is a cast type, we dont need to create a relationship since there is no table for the type
+        if not other_wrapped_table:
+            wrapped_table.properties[field_info.name] = wrapped_table.mapped_table.c.get(field_info.name)
         else:
-            wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
-                other_wrapped_table.tablename,
-                foreign_keys=[fk])
+            if wrapped_table.clazz == other_wrapped_table.clazz:
+                column_name = field_info.name + self.foreign_key_postfix
+                wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
+                    wrapped_table.tablename,
+                    remote_side=[wrapped_table.primary_key],
+                    foreign_keys=[wrapped_table.mapped_table.c.get(column_name)])
+            else:
+                wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
+                    other_wrapped_table.tablename,
+                    foreign_keys=[fk])
 
     def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
@@ -371,17 +357,21 @@ class WrappedTable:
         result = {}
         properties = {}
         for name, relation in self.properties.items():
-            relation: RelationshipProperty
+            # TODO think of a better way to handle cast types
+            if type(relation) == Column:
+                result["properties"] = "{" + f"{name}:" + f"t_{self.tablename}.c.{name}" + "}"
+            elif type(relation) == sqlalchemy.orm.relationship:
+                relation: RelationshipProperty
 
-            relation_argument = relation.argument
+                relation_argument = relation.argument
 
-            if isinstance(relation.argument, type):
-                relation_argument = relation.argument.__name__
-                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], default_factory=list)"
-            elif relation_argument == self.tablename:
-                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], remote_side=[t_{self.tablename}.c.id])"
-            else:
-                properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id])"
+                if isinstance(relation.argument, type):
+                    relation_argument = relation.argument.__name__
+                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], default_factory=list)"
+                elif relation_argument == self.tablename:
+                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], remote_side=[t_{self.tablename}.c.id])"
+                else:
+                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id])"
 
         if properties:
             result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"
