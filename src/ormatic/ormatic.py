@@ -171,7 +171,8 @@ class ORMatic:
 
         # if the field is a cast type, we dont need to create a relationship since there is no table for the type
         if not other_wrapped_table:
-            wrapped_table.properties[field_info.name] = wrapped_table.mapped_table.c.get(field_info.name)
+            r = [column for column in wrapped_table.columns if column.name == field_info.name][0]
+            wrapped_table.properties[field_info.name] = r
         else:
             if wrapped_table.clazz == other_wrapped_table.clazz:
                 column_name = field_info.name + self.foreign_key_postfix
@@ -357,10 +358,9 @@ class WrappedTable:
         result = {}
         properties = {}
         for name, relation in self.properties.items():
-            # TODO think of a better way to handle cast types
             if type(relation) == Column:
-                result["properties"] = "{" + f"{name}:" + f"t_{self.tablename}.c.{name}" + "}"
-            elif type(relation) == sqlalchemy.orm.relationship:
+                properties[name] = f"t_{self.tablename}.c.{name}"
+            else:
                 relation: RelationshipProperty
 
                 relation_argument = relation.argument

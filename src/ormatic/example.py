@@ -6,7 +6,7 @@ from enum import Enum
 from sqlalchemy import Column, types
 from typing_extensions import List, Optional, Type
 
-from ormatic.utils import ORMaticExplicitMapping
+from ormatic.utils import ORMaticExplicitMapping, classproperty
 
 
 class Element(str, Enum):
@@ -130,10 +130,21 @@ class Cup(PhysicalObject):
 class Bowl(PhysicalObject):
     pass
 
+@dataclass
+class OriginalSimulatedObject:
+    concept: PhysicalObject
+    pose: Pose
+    placeholder: float
+
 
 @dataclass
-class SimulatedObject:
+class SimulatedObject(ORMaticExplicitMapping):
     concept: PhysicalObject
+    pose: Pose
+
+    @classproperty
+    def explicit_mapping(cls):
+        return OriginalSimulatedObject
 
 
 class PhysicalObjectType(types.TypeDecorator):

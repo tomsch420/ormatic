@@ -33,12 +33,6 @@ t_Positions = Table(
     Column('id', Integer, primary_key=True)
 )
 
-t_SimulatedObject = Table(
-    'SimulatedObject', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('concept', PhysicalObjectType)
-)
-
 t_Position = Table(
     'Position', metadata,
     Column('id', Integer, primary_key=True),
@@ -62,20 +56,29 @@ t_Position4D = Table(
     Column('w', Float, nullable=False)
 )
 
+t_SimulatedObject = Table(
+    'SimulatedObject', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('concept', PhysicalObjectType),
+    Column('pose_id', ForeignKey('Pose.id'))
+)
+
 mapper_registry = registry(metadata=metadata)
 
 m_Position = mapper_registry.map_imperatively(ormatic.example.Position, t_Position, polymorphic_on = "polymorphic_type", polymorphic_identity = "Position")
 
 m_Orientation = mapper_registry.map_imperatively(ormatic.example.Orientation, t_Orientation, )
 
-m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, )
+m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship("Position", foreign_keys=[t_Pose.c.position_id]), 
+orientation=relationship("Orientation", foreign_keys=[t_Pose.c.orientation_id])))
 
-m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, )
+m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", foreign_keys=[t_Positions.c.positions_id], default_factory=list)))
 
 m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
 
-m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, )
+m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship("Node", foreign_keys=[t_Node.c.parent_id], remote_side=[t_Node.c.id])))
 
-m_SimulatedObject = mapper_registry.map_imperatively(ormatic.example.SimulatedObject, t_SimulatedObject, properties = {concept:t_SimulatedObject.c.concept})
+m_SimulatedObject = mapper_registry.map_imperatively(ormatic.example.OriginalSimulatedObject, t_SimulatedObject, properties = dict(concept=t_SimulatedObject.c.concept, 
+pose=relationship("Pose", foreign_keys=[t_SimulatedObject.c.pose_id])))
 
 m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)

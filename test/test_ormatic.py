@@ -224,16 +224,16 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result, [p1, p2])
 
     def test_type_casting(self):
-        classes = [SimulatedObject]
+        classes = [Position, Orientation, Pose, SimulatedObject]
         ormatic = ORMatic(classes, self.mapper_registry, type_mappings={PhysicalObject: PhysicalObjectType()})
         ormatic.make_all_tables()
 
         self.mapper_registry.metadata.create_all(self.session.bind)
 
-        obj1 = SimulatedObject(Bowl())
+        obj1 = OriginalSimulatedObject(Bowl(), Pose(Position(0,0,0), Orientation(0,0,0,1)), 5)
         self.session.add(obj1)
         self.session.commit()
-        result = self.session.scalar(select(SimulatedObject))
+        result = self.session.scalar(select(OriginalSimulatedObject))
 
         self.assertEqual(result, obj1)
         self.assertIsInstance(result.concept, Bowl)
@@ -241,13 +241,12 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result.concept, obj1.concept)
 
         with self.session.bind.connect() as connection:
-            result = connection.execute(text("select * from SimulatedObject"))
+            result = connection.execute(text("select * from SimulatedObject JOIN Pose ON SimulatedObject.pose_id = Pose.id"))
             store_rows = []
             for row in result:
                 store_rows.append(row)
-                print(row)
 
-        self.assertEqual(len(store_rows[0]), 2)
+        self.assertEqual(len(store_rows[0]), 6)
         self.assertEqual(type(store_rows[0][1]), str)
 
 
