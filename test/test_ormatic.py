@@ -3,7 +3,7 @@ import sys
 import unittest
 
 import sqlacodegen.generators
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import registry, Session, clear_mappers
 
 import ormatic.example
@@ -182,8 +182,8 @@ class ORMaticTestCase(unittest.TestCase):
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node]
-        ormatic = ORMatic(classes, self.mapper_registry)
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject]
+        ormatic = ORMatic(classes, self.mapper_registry, {PhysicalObject: PhysicalObjectType()})
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
 
@@ -223,7 +223,31 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(len(result), len([p1, p2]))
         self.assertEqual(result, [p1, p2])
 
+    def test_type_casting(self):
+        classes = [Position, Orientation, Pose, SimulatedObject]
+        ormatic = ORMatic(classes, self.mapper_registry, type_mappings={PhysicalObject: PhysicalObjectType()})
+        ormatic.make_all_tables()
 
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        obj1 = OriginalSimulatedObject(Bowl(), Pose(Position(0,0,0), Orientation(0,0,0,1)), 5)
+        self.session.add(obj1)
+        self.session.commit()
+        result = self.session.scalar(select(OriginalSimulatedObject))
+
+        self.assertEqual(result, obj1)
+        self.assertIsInstance(result.concept, Bowl)
+        self.assertEqual(result.concept, obj1.concept)
+        self.assertEqual(result.concept, obj1.concept)
+
+        with self.session.bind.connect() as connection:
+            result = connection.execute(text("select * from SimulatedObject JOIN Pose ON SimulatedObject.pose_id = Pose.id"))
+            store_rows = []
+            for row in result:
+                store_rows.append(row)
+
+        self.assertEqual(len(store_rows[0]), 6)
+        self.assertEqual(type(store_rows[0][1]), str)
 
 
 if __name__ == '__main__':
