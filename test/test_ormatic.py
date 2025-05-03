@@ -131,6 +131,34 @@ class ORMaticTestCase(unittest.TestCase):
         positions = self.session.scalars(select(Positions)).one()
         self.assertEqual(positions.positions, [p1, p2])
 
+    def test_one_to_many_multiple(self):
+        classes = [Position, DoublePositionAggregator]
+        result = ORMatic(classes, self.mapper_registry)
+
+        double_positions_table = result.class_dict[DoublePositionAggregator].mapped_table.local_table
+        position_table = result.class_dict[Position].mapped_table.local_table
+
+        foreign_keys = position_table.foreign_keys
+        self.assertEqual(len(foreign_keys), 2)
+
+        self.assertEqual(len(double_positions_table.columns), 1)
+
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        p1 = Position(x=1, y=2, z=3)
+        p2 = Position(x=2, y=3, z=4)
+        p3 = Position(x=3, y=4, z=5)
+
+        positions = DoublePositionAggregator([p1, p2], [p3])
+
+
+        self.session.add(positions)
+        self.session.commit()
+
+        queried = self.session.scalars(select(DoublePositionAggregator)).one()
+        self.assertEqual(positions, queried)
+
+
     def test_inheritance(self):
         classes = [Position, Position4D, Position5D]
         result = ORMatic(classes, self.mapper_registry)

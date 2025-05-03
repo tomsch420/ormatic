@@ -49,6 +49,11 @@ class Positions:
     some_strings: List[str]
 
 @dataclass
+class DoublePositionAggregator:
+    positions1: List[Position]
+    positions2: List[Position]
+
+@dataclass
 class Position4D(Position):
     w: float
 

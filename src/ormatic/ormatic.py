@@ -226,7 +226,8 @@ class ORMatic:
         # add a relationship to this table holding the list of objects from the field.type table
         wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(field_info.type,
                                                                                 # back_populates=wrapped_table.foreign_key_name,
-                                                                                default_factory=field_info.container)
+                                                                                default_factory=field_info.container,
+                                                                                foreign_keys=[fk])
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
         # monkeypatch the render_column_type method to handle Enum types better
