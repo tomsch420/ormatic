@@ -55,7 +55,7 @@ class FieldInfo:
     def __init__(self, clazz: Type, f: Field):
 
         self.name = f.name
-
+        self.clazz = clazz
         type_hints = get_type_hints(clazz)[self.name]
         type_args = typing.get_args(type_hints)
 

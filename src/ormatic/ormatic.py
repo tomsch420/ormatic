@@ -217,7 +217,8 @@ class ORMatic:
         child_wrapped_table = self.class_dict[field_info.type]
 
         # add a foreign key to the other table describing this table
-        fk = sqlalchemy.Column(wrapped_table.foreign_key_name + self.foreign_key_postfix, Integer,
+        fk_name = f"{field_info.clazz.__name__.lower()}_{field_info.name}{self.foreign_key_postfix}"
+        fk = sqlalchemy.Column(fk_name, Integer,
                                sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
                                nullable=True)
         child_wrapped_table.columns.append(fk)

@@ -46,8 +46,7 @@ class Pose:
 @dataclass
 class Positions:
     positions: List[Position]
-    # some_strings: List[str] array are postgresql only :(
-
+    some_strings: List[str]
 
 @dataclass
 class Position4D(Position):

@@ -1,6 +1,6 @@
 from ormatic.example import PhysicalObjectType
 
-from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, MetaData, String, Table
+from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, JSON, MetaData, String, Table
 from sqlalchemy.orm import registry, relationship
 import ormatic.example
 
@@ -30,7 +30,8 @@ t_Orientation = Table(
 
 t_Positions = Table(
     'Positions', metadata,
-    Column('id', Integer, primary_key=True)
+    Column('id', Integer, primary_key=True),
+    Column('some_strings', JSON)
 )
 
 t_Position = Table(
@@ -39,7 +40,7 @@ t_Position = Table(
     Column('x', Float, nullable=False),
     Column('y', Float, nullable=False),
     Column('z', Float, nullable=False),
-    Column('positions_id', ForeignKey('Positions.id')),
+    Column('positions_positions_id', ForeignKey('Positions.id')),
     Column('polymorphic_type', String)
 )
 

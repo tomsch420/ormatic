@@ -116,14 +116,14 @@ class ORMaticTestCase(unittest.TestCase):
         foreign_keys = position_table.foreign_keys
         self.assertEqual(len(foreign_keys), 1)
 
-        self.assertEqual(len(positions_table.columns), 1)
+        self.assertEqual(len(positions_table.columns), 2)
 
         self.mapper_registry.metadata.create_all(self.session.bind)
 
         p1 = Position(x=1, y=2, z=3)
         p2 = Position(x=2, y=3, z=4)
 
-        positions = Positions([p1, p2])
+        positions = Positions([p1, p2], ["a", "b"])
 
         self.session.add(positions)
         self.session.commit()
