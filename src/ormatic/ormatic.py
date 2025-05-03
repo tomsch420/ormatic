@@ -11,10 +11,10 @@ import sqlacodegen.generators
 import sqlalchemy
 from sqlalchemy import Table, Integer, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
-from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.orm.relationships import _RelationshipDeclared, Relationship
 from typing_extensions import List, Type, Dict, Optional
 
-from .field_info import ParseError, FieldInfo
+from .field_info import ParseError, FieldInfo, RelationshipInfo, CustomTypeInfo
 from .utils import ORMaticExplicitMapping
 
 logger = logging.getLogger(__name__)
@@ -56,11 +56,19 @@ class ORMatic:
         :param classes: The list of classes to be mapped.
         :param mapper_registry: The SQLAlchemy mapper registry. This is needed for the relationship configuration.
         """
+
+        #  initialize the instance variables
+        self.type_mappings = type_mappings or {}
+        self.mapper_registry = mapper_registry
+        self.polymorphic_union = {}
         self.class_dict = {}
 
+        # create the class dependency graph
         self.make_class_dependency_graph(classes)
 
+        # create the classes in dependency-resolved order
         for clazz in nx.topological_sort(self.class_dependency_graph):
+
             # get the inheritance tree
             bases: List[Type] = [base for (base, _) in self.class_dependency_graph.in_edges(clazz)]
             if len(bases) > 1:
@@ -68,7 +76,8 @@ class ORMatic:
 
             base = self.class_dict[bases[0]] if bases else None
 
-            wrapped_table = WrappedTable(clazz, [], {}, mapper_registry, parent_class=base)
+            # wrap the classes to aggregate the needed properties before compiling it with sql
+            wrapped_table = WrappedTable(clazz=clazz, mapper_registry=mapper_registry, parent_class=base)
 
             self.class_dict[clazz] = wrapped_table
 
@@ -76,12 +85,13 @@ class ORMatic:
             if base:
                 base.subclasses.append(wrapped_table)
 
-        self.type_mappings = type_mappings or {}
-        self.mapper_registry = mapper_registry
-        self.polymorphic_union = {}
+        # parse all classes
         self.parse_classes()
 
     def make_class_dependency_graph(self, classes: List[Type]):
+        """
+        Create a direct acyclic graph containing the class hierarchy.
+        """
         self.class_dependency_graph = nx.DiGraph()
 
         for clazz in classes:
@@ -90,7 +100,6 @@ class ORMatic:
             for base in clazz.__bases__:
                 if base in classes:
                     self.class_dependency_graph.add_edge(base, clazz)
-
 
     def make_all_tables(self) -> Dict[Type, Mapper]:
         """
@@ -123,6 +132,7 @@ class ORMatic:
     def parse_field(self, wrapped_table: WrappedTable, f: Field):
         """
         Parse a single field.
+        This is done by checking the type information of a field and delegating it to the correct method.
 
         :param wrapped_table: The WrappedTable object where the field is in the clazz attribute
         :param f: The field to parse
@@ -139,7 +149,11 @@ class ORMatic:
         elif field_info.is_builtin_class or field_info.is_enum or field_info.is_datetime:
             logger.info(f"Parsing as builtin type.")
             wrapped_table.columns.append(field_info.column)
-        elif not field_info.container and (field_info.type in self.class_dict or field_info.type in self.type_mappings.keys()):
+        elif field_info.type in self.type_mappings:
+            logger.info(f"Parsing as custom type mapping.")
+            self.create_custom_type_column(wrapped_table, field_info)
+        elif not field_info.container and (
+                field_info.type in self.class_dict or field_info.type in self.type_mappings.keys()):
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(wrapped_table, field_info)
         elif field_info.container:
@@ -147,6 +161,12 @@ class ORMatic:
             self.parse_container_field(wrapped_table, field_info)
         else:
             logger.info("Skipping due to not handled type.")
+
+    def foreign_key_name(self, field_info: FieldInfo):
+        """
+        :return: A foreign key name for the given field.
+        """
+        return f"{field_info.clazz.__name__.lower()}_{field_info.name}{self.foreign_key_postfix}"
 
     def create_one_to_one_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
@@ -158,32 +178,39 @@ class ORMatic:
         :param wrapped_table: The table that the relationship will be created on
         :param field_info: The field that the relationship will be created for
         """
-        # check if the field has a type that needs to be cast.
-        if field_info.type in self.type_mappings.keys():
-            other_wrapped_table = None
-            fk = sqlalchemy.Column(field_info.name, self.type_mappings[field_info.type], nullable=True)
-        else:
-            other_wrapped_table = self.class_dict[field_info.type]
-            # create foreign key to field.type
-            fk = sqlalchemy.Column(field_info.name + self.foreign_key_postfix, Integer,
-                                   sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name), nullable=True)
-        wrapped_table.columns.append(fk)
 
-        # if the field is a cast type, we dont need to create a relationship since there is no table for the type
-        if not other_wrapped_table:
-            r = [column for column in wrapped_table.columns if column.name == field_info.name][0]
-            wrapped_table.properties[field_info.name] = r
+        fk_name = f"{field_info.name}{self.foreign_key_postfix}"
+
+        other_wrapped_table = self.class_dict[field_info.type]
+
+        # create a foreign key to field.type
+        column = sqlalchemy.Column(fk_name, Integer,
+                                   sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name),
+                                   nullable=field_info.optional)
+        wrapped_table.columns.append(column)
+
+        # if it is an ordinary one-to-one relationship
+        if wrapped_table.clazz != other_wrapped_table.clazz:
+            relationship_ = sqlalchemy.orm.relationship(other_wrapped_table.clazz,
+                foreign_keys=[column])
+            relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info,
+                                                 foreign_key_name=fk_name)
         else:
-            if wrapped_table.clazz == other_wrapped_table.clazz:
-                column_name = field_info.name + self.foreign_key_postfix
-                wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
-                    wrapped_table.tablename,
-                    remote_side=[wrapped_table.primary_key],
-                    foreign_keys=[wrapped_table.mapped_table.c.get(column_name)])
-            else:
-                wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(
-                    other_wrapped_table.tablename,
-                    foreign_keys=[fk])
+            # handle self-referencing relationship
+            relationship_ = sqlalchemy.orm.relationship(wrapped_table.clazz,
+                remote_side=[wrapped_table.primary_key], foreign_keys=[column])
+
+            relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info, foreign_key_name=fk_name)
+        wrapped_table.one_to_one_relationships.append(relationship_info)
+
+
+    def create_custom_type_column(self, wrapped_table: WrappedTable, field_info: FieldInfo):
+        custom_type = self.type_mappings[field_info.type]
+        column = sqlalchemy.Column(field_info.name, custom_type, nullable=field_info.optional)
+        wrapped_table.columns.append(column)
+        r = [column for column in wrapped_table.columns if column.name == field_info.name][0]
+        custom_type_info = CustomTypeInfo(custom_type=custom_type, field_info=field_info, column=r)
+        wrapped_table.custom_types.append(custom_type_info)
 
     def parse_container_field(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
@@ -197,8 +224,6 @@ class ORMatic:
             self.create_one_to_many_relationship(wrapped_table, field_info)
 
         elif field_info.is_container_of_builtin:
-            # TODO: store lists of builtins not as JSON, e. g
-            #  column = sqlalchemy.Column(field_info.name, ARRAY(sqlalchemy_type(field_info.type)))
             column = sqlalchemy.Column(field_info.name, JSON)
             wrapped_table.columns.append(column)
 
@@ -217,28 +242,28 @@ class ORMatic:
         child_wrapped_table = self.class_dict[field_info.type]
 
         # add a foreign key to the other table describing this table
-        fk_name = f"{field_info.clazz.__name__.lower()}_{field_info.name}{self.foreign_key_postfix}"
-        fk = sqlalchemy.Column(fk_name, Integer,
-                               sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
+        fk_name = self.foreign_key_name(field_info)
+        fk = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
                                nullable=True)
         child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
-        wrapped_table.properties[field_info.name] = sqlalchemy.orm.relationship(field_info.type,
-                                                                                # back_populates=wrapped_table.foreign_key_name,
-                                                                                default_factory=field_info.container,
-                                                                                foreign_keys=[fk])
+        relationship_ =  sqlalchemy.orm.relationship(field_info.type, default_factory=field_info.container,
+                                                     foreign_keys=[fk])
+        relationship_info = RelationshipInfo(foreign_key_name=fk_name, relationship=relationship_, field_info=field_info,)
+        wrapped_table.one_to_many_relationships.append(relationship_info)
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
-        # monkeypatch the render_column_type method to handle Enum types better
+        # monkeypatch the render_column_type method to handle Enum types as desired
         generator.render_column_type_old = generator.render_column_type
-        generator.render_column_type = render_enum_aware_column_type.__get__(generator, sqlacodegen.generators.TablesGenerator)
+        generator.render_column_type = render_enum_aware_column_type.__get__(generator,
+                                                                             sqlacodegen.generators.TablesGenerator)
 
         # collect imports
-        generator.module_imports |= {clazz.explicit_mapping.__module__ for clazz in self.class_dict.keys()
-                                     if issubclass(clazz, ORMaticExplicitMapping)}
+        generator.module_imports |= {clazz.explicit_mapping.__module__ for clazz in self.class_dict.keys() if
+                                     issubclass(clazz, ORMaticExplicitMapping)}
         generator.module_imports |= {clazz.__module__ for clazz in self.class_dict.keys()}
-        generator.imports["sqlalchemy.orm"] = {"registry", "relationship"}
+        generator.imports["sqlalchemy.orm"] = {"registry", "relationship", "RelationshipProperty"}
 
         # write tables
         file.write(generator.generate())
@@ -247,10 +272,11 @@ class ORMatic:
         file.write("\n")
         file.write("mapper_registry = registry(metadata=metadata)\n")
 
+        # write imperative mapping calls
         for wrapped_table in self.class_dict.values():
             file.write("\n")
 
-            parsed_kwargs = wrapped_table.mapper_kwargs_for_python_file
+            parsed_kwargs = wrapped_table.mapper_kwargs_for_python_file(self)
             if issubclass(wrapped_table.clazz, ORMaticExplicitMapping):
                 key = wrapped_table.clazz.explicit_mapping
             else:
@@ -272,18 +298,28 @@ class WrappedTable:
     The dataclass that this WrappedTable wraps.
     """
 
-    columns: List[Column]
+    mapper_registry: registry
+    """
+    The SQLAlchemy mapper registry. This is needed for the relationship configuration.
+    """
+
+    columns: List[Column] = field(default_factory=list)
     """
     A list of columns that will be added to the SQLAlchemy table.
     """
 
-    properties: Dict[str, Any]
+    one_to_one_relationships: List[RelationshipInfo] = field(default_factory=list)
     """
-    A dictionary of properties that will be added to the registry properties."""
+    A list of one-to-one relationships that will be added to the SQLAlchemy table."""
 
-    mapper_registry: registry
+    one_to_many_relationships: List[RelationshipInfo] = field(default_factory=list)
     """
-    The SQLAlchemy mapper registry. This is needed for the relationship configuration.
+    A list of one-to-many relationships that will be added to the SQLAlchemy table.
+    """
+
+    custom_types: List[CustomTypeInfo] = field(default_factory=list)
+    """
+    A list of custom column types that will be added to the SQLAlchemy table.
     """
 
     primary_key_name: str = "id"
@@ -311,7 +347,7 @@ class WrappedTable:
     The parent class of self.clazz if it exists.
     """
 
-    @property
+    @cached_property
     def primary_key(self):
         if self.parent_class:
             column_type = ForeignKey(self.parent_class.full_primary_key_name)
@@ -341,10 +377,39 @@ class WrappedTable:
         return self.has_subclasses and not self.parent_class
 
     @property
+    def properties_kwargs(self) -> Dict[str, Any]:
+        """
+        :return: A dict of properties that can be used in the `mapper_kwargs`
+        """
+        return {**self.relationships_kwargs, **self.custom_type_kwargs}
+
+
+    @property
+    def relationships_kwargs(self) -> Dict[str, Any]:
+        """
+        :return: A dict of relationship properties that can be used in the `properties`
+        """
+        result = {}
+        for relationship_info in self.one_to_one_relationships:
+            result[relationship_info.field_info.name] = relationship_info.relationship
+        for relationship_info in self.one_to_many_relationships:
+            result[relationship_info.field_info.name] = relationship_info.relationship
+        return result
+
+    @property
+    def custom_type_kwargs(self) -> Dict[str, Any]:
+        """
+        :return: A dict of custom type properties that can be used in the `properties
+        """
+        result = {}
+        for custom_type in self.custom_types:
+            result[custom_type.field_info.name] = custom_type.column
+        return result
+
+
+    @property
     def mapper_kwargs(self):
-        kwargs = {
-            "properties": self.properties
-        }
+        kwargs = {"properties": self.properties_kwargs}
 
         if self.is_root_of_non_empty_inheritance_structure:
             kwargs["polymorphic_on"] = self.polymorphic_on_name
@@ -355,25 +420,23 @@ class WrappedTable:
 
         return kwargs
 
-    @property
-    def mapper_kwargs_for_python_file(self) -> str:
+    def mapper_kwargs_for_python_file(self, ormatic: ORMatic) -> str:
         result = {}
         properties = {}
-        for name, relation in self.properties.items():
-            if type(relation) == Column:
-                properties[name] = f"t_{self.tablename}.c.{name}"
-            else:
-                relation: RelationshipProperty
 
-                relation_argument = relation.argument
+        for relationship_info in self.one_to_one_relationships:
+            foreign_key_constraint = f"t_{self.tablename}.c.{relationship_info.field_info.name}_id"
+            properties[relationship_info.field_info.name] = (f"relationship('{relationship_info.field_info.type.__name__}',"
+                                                         f"foreign_keys=[{foreign_key_constraint}])")
 
-                if isinstance(relation.argument, type):
-                    relation_argument = relation.argument.__name__
-                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], default_factory=list)"
-                elif relation_argument == self.tablename:
-                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id], remote_side=[t_{self.tablename}.c.id])"
-                else:
-                    properties[name] = f"relationship(\"{relation_argument}\", foreign_keys=[t_{self.tablename}.c.{name}_id])"
+
+        for relationship_info in self.one_to_many_relationships:
+            foreign_key_constraint = f"t_{ormatic.class_dict[relationship_info.relationship.argument].tablename}.c.{relationship_info.foreign_key_name}"
+            properties[relationship_info.field_info.name] = (f"relationship('{relationship_info.field_info.type.__name__}',"
+                                                             f"foreign_keys=[{foreign_key_constraint}])")
+
+        for custom_type_info in self.custom_types:
+            properties[custom_type_info.field_info.name] = f"t_{self.tablename}.c.{custom_type_info.field_info.name}"
 
         if properties:
             result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"
@@ -399,11 +462,7 @@ class WrappedTable:
         if self.is_root_of_non_empty_inheritance_structure:
             columns.append(Column(self.polymorphic_on_name, sqlalchemy.String))
 
-        table = Table(
-            self.tablename,
-            self.mapper_registry.metadata,
-            *columns,
-        )
+        table = Table(self.tablename, self.mapper_registry.metadata, *columns, )
 
         if issubclass(self.clazz, ORMaticExplicitMapping):
             clazz = self.clazz.explicit_mapping
@@ -429,4 +488,3 @@ def render_enum_aware_column_type(self: sqlacodegen.generators.TablesGenerator, 
     if not isinstance(coltype, sqlalchemy.Enum):
         return self.render_column_type_old(coltype)
     return f"Enum({coltype.python_type.__module__}.{coltype.python_type.__name__})"
-

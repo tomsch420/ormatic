@@ -8,7 +8,8 @@ from functools import cached_property
 from types import NoneType
 
 import sqlalchemy
-from sqlalchemy import Column
+from sqlalchemy import Column, TypeDecorator
+from sqlalchemy.orm.relationships import _RelationshipDeclared
 from typing_extensions import Type, get_origin, Optional, get_type_hints
 
 
@@ -49,7 +50,7 @@ class FieldInfo:
 
     container: Optional[Type]
     """
-    The type of the container if it is one (list, set, tuple, etc.).
+    The type of the container if it is one (list, set, tuple, etc.). If there is no container this is None
     """
 
     def __init__(self, clazz: Type, f: Field):
@@ -99,6 +100,29 @@ class FieldInfo:
     @property
     def is_datetime(self):
         return self.type == datetime
+
+
+@dataclass
+class RelationshipInfo:
+    """
+    Wrapper class for relationships since sqlalchemy loses information in its process.
+    """
+    foreign_key_name: str
+    relationship: _RelationshipDeclared
+    field_info: FieldInfo
+
+    @property
+    def is_one_to_one(self) -> bool:
+        return self.field_info.container is None
+
+@dataclass
+class CustomTypeInfo:
+    """
+    Wrapper object to associate custom types with fields.
+    """
+    column: Column
+    custom_type: TypeDecorator
+    field_info: FieldInfo
 
 
 def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:

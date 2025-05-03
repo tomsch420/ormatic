@@ -210,7 +210,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject]
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject, DoublePositionAggregator]
         ormatic = ORMatic(classes, self.mapper_registry, {PhysicalObject: PhysicalObjectType()})
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -219,6 +219,9 @@ class ORMaticTestCase(unittest.TestCase):
 
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
+
+        # with open('orm_interface.py', 'r') as f:
+        #     exec(f.read())
 
     def test_molecule(self):
         classes = [Atom, Bond, Molecule]

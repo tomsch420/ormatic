@@ -1,11 +1,16 @@
 from ormatic.example import PhysicalObjectType
 
 from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, JSON, MetaData, String, Table
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.orm import RelationshipProperty, registry, relationship
 import ormatic.example
 
 metadata = MetaData()
 
+
+t_DoublePositionAggregator = Table(
+    'DoublePositionAggregator', metadata,
+    Column('id', Integer, primary_key=True)
+)
 
 t_EnumContainer = Table(
     'EnumContainer', metadata,
@@ -41,14 +46,16 @@ t_Position = Table(
     Column('y', Float, nullable=False),
     Column('z', Float, nullable=False),
     Column('positions_positions_id', ForeignKey('Positions.id')),
+    Column('doublepositionaggregator_positions1_id', ForeignKey('DoublePositionAggregator.id')),
+    Column('doublepositionaggregator_positions2_id', ForeignKey('DoublePositionAggregator.id')),
     Column('polymorphic_type', String)
 )
 
 t_Pose = Table(
     'Pose', metadata,
     Column('id', Integer, primary_key=True),
-    Column('position_id', ForeignKey('Position.id')),
-    Column('orientation_id', ForeignKey('Orientation.id'))
+    Column('position_id', ForeignKey('Position.id'), nullable=False),
+    Column('orientation_id', ForeignKey('Orientation.id'), nullable=False)
 )
 
 t_Position4D = Table(
@@ -60,8 +67,8 @@ t_Position4D = Table(
 t_SimulatedObject = Table(
     'SimulatedObject', metadata,
     Column('id', Integer, primary_key=True),
-    Column('concept', PhysicalObjectType),
-    Column('pose_id', ForeignKey('Pose.id'))
+    Column('concept', PhysicalObjectType, nullable=False),
+    Column('pose_id', ForeignKey('Pose.id'), nullable=False)
 )
 
 mapper_registry = registry(metadata=metadata)
@@ -70,16 +77,19 @@ m_Position = mapper_registry.map_imperatively(ormatic.example.Position, t_Positi
 
 m_Orientation = mapper_registry.map_imperatively(ormatic.example.Orientation, t_Orientation, )
 
-m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship("Position", foreign_keys=[t_Pose.c.position_id]), 
-orientation=relationship("Orientation", foreign_keys=[t_Pose.c.orientation_id])))
+m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship('Position',foreign_keys=[t_Pose.c.position_id]), 
+orientation=relationship('Orientation',foreign_keys=[t_Pose.c.orientation_id])))
 
-m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship("Position", foreign_keys=[t_Positions.c.positions_id], default_factory=list)))
+m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship('Position',foreign_keys=[t_Position.c.positions_positions_id])))
 
 m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
 
-m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship("Node", foreign_keys=[t_Node.c.parent_id], remote_side=[t_Node.c.id])))
+m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship('Node',foreign_keys=[t_Node.c.parent_id])))
 
-m_SimulatedObject = mapper_registry.map_imperatively(ormatic.example.OriginalSimulatedObject, t_SimulatedObject, properties = dict(concept=t_SimulatedObject.c.concept, 
-pose=relationship("Pose", foreign_keys=[t_SimulatedObject.c.pose_id])))
+m_SimulatedObject = mapper_registry.map_imperatively(ormatic.example.OriginalSimulatedObject, t_SimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_SimulatedObject.c.pose_id]), 
+concept=t_SimulatedObject.c.concept))
+
+m_DoublePositionAggregator = mapper_registry.map_imperatively(ormatic.example.DoublePositionAggregator, t_DoublePositionAggregator, properties = dict(positions1=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions1_id]), 
+positions2=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions2_id])))
 
 m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)
