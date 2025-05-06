@@ -23,6 +23,10 @@ class Element(str, Enum):
 
 
 @dataclass
+class PositionTypeWrapper:
+    position_type: Type[Position]
+
+@dataclass
 class Position:
     x: float
     y: float

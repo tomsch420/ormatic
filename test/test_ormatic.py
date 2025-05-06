@@ -280,6 +280,18 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(len(store_rows[0]), 6)
         self.assertEqual(type(store_rows[0][1]), str)
 
+    def test_type_type(self):
+        classes = [PositionTypeWrapper]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        wrapper = PositionTypeWrapper(Position)
+        self.session.add(wrapper)
+        self.session.commit()
+        result = self.session.scalars(select(PositionTypeWrapper)).one()
+        self.assertEqual(result, wrapper)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -11,9 +11,9 @@ import sqlacodegen.generators
 import sqlalchemy
 from sqlalchemy import Table, Integer, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
-from sqlalchemy.orm.relationships import _RelationshipDeclared, Relationship
 from typing_extensions import List, Type, Dict, Optional
 
+from .custom_types import TypeType
 from .field_info import ParseError, FieldInfo, RelationshipInfo, CustomTypeInfo
 from .utils import ORMaticExplicitMapping
 
@@ -146,6 +146,14 @@ class ORMatic:
         if f.name.startswith("_"):
             logger.info(f"Skipping.")
             return
+
+        elif field_info.is_type_type:
+            logger.info(f"Parsing as type.")
+            type_type = TypeType
+            column = Column(field_info.name, type_type)
+            wrapped_table.columns.append(column)
+            wrapped_table.custom_types.append(CustomTypeInfo(column, type_type, field_info))
+
         elif field_info.is_builtin_class or field_info.is_enum or field_info.is_datetime:
             logger.info(f"Parsing as builtin type.")
             wrapped_table.columns.append(field_info.column)
@@ -192,17 +200,17 @@ class ORMatic:
         # if it is an ordinary one-to-one relationship
         if wrapped_table.clazz != other_wrapped_table.clazz:
             relationship_ = sqlalchemy.orm.relationship(other_wrapped_table.clazz,
-                foreign_keys=[column])
+                                                        foreign_keys=[column])
             relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info,
                                                  foreign_key_name=fk_name)
         else:
             # handle self-referencing relationship
             relationship_ = sqlalchemy.orm.relationship(wrapped_table.clazz,
-                remote_side=[wrapped_table.primary_key], foreign_keys=[column])
+                                                        remote_side=[wrapped_table.primary_key], foreign_keys=[column])
 
-            relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info, foreign_key_name=fk_name)
+            relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info,
+                                                 foreign_key_name=fk_name)
         wrapped_table.one_to_one_relationships.append(relationship_info)
-
 
     def create_custom_type_column(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         custom_type = self.type_mappings[field_info.type]
@@ -248,9 +256,10 @@ class ORMatic:
         child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
-        relationship_ =  sqlalchemy.orm.relationship(field_info.type, default_factory=field_info.container,
-                                                     foreign_keys=[fk])
-        relationship_info = RelationshipInfo(foreign_key_name=fk_name, relationship=relationship_, field_info=field_info,)
+        relationship_ = sqlalchemy.orm.relationship(field_info.type, default_factory=field_info.container,
+                                                    foreign_keys=[fk])
+        relationship_info = RelationshipInfo(foreign_key_name=fk_name, relationship=relationship_,
+                                             field_info=field_info, )
         wrapped_table.one_to_many_relationships.append(relationship_info)
 
     def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
@@ -383,7 +392,6 @@ class WrappedTable:
         """
         return {**self.relationships_kwargs, **self.custom_type_kwargs}
 
-
     @property
     def relationships_kwargs(self) -> Dict[str, Any]:
         """
@@ -406,7 +414,6 @@ class WrappedTable:
             result[custom_type.field_info.name] = custom_type.column
         return result
 
-
     @property
     def mapper_kwargs(self):
         kwargs = {"properties": self.properties_kwargs}
@@ -426,14 +433,15 @@ class WrappedTable:
 
         for relationship_info in self.one_to_one_relationships:
             foreign_key_constraint = f"t_{self.tablename}.c.{relationship_info.field_info.name}_id"
-            properties[relationship_info.field_info.name] = (f"relationship('{relationship_info.field_info.type.__name__}',"
-                                                         f"foreign_keys=[{foreign_key_constraint}])")
-
+            properties[relationship_info.field_info.name] = (
+                f"relationship('{relationship_info.field_info.type.__name__}',"
+                f"foreign_keys=[{foreign_key_constraint}])")
 
         for relationship_info in self.one_to_many_relationships:
             foreign_key_constraint = f"t_{ormatic.class_dict[relationship_info.relationship.argument].tablename}.c.{relationship_info.foreign_key_name}"
-            properties[relationship_info.field_info.name] = (f"relationship('{relationship_info.field_info.type.__name__}',"
-                                                             f"foreign_keys=[{foreign_key_constraint}])")
+            properties[relationship_info.field_info.name] = (
+                f"relationship('{relationship_info.field_info.type.__name__}',"
+                f"foreign_keys=[{foreign_key_constraint}])")
 
         for custom_type_info in self.custom_types:
             properties[custom_type_info.field_info.name] = f"t_{self.tablename}.c.{custom_type_info.field_info.name}"

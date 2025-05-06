@@ -53,6 +53,8 @@ class FieldInfo:
     The type of the container if it is one (list, set, tuple, etc.). If there is no container this is None
     """
 
+    is_type_field: bool = False
+
     def __init__(self, clazz: Type, f: Field):
 
         self.name = f.name
@@ -72,6 +74,9 @@ class FieldInfo:
             else:
                 self.container = get_origin(type_hints)
 
+            if not self.optional and type_hints == Type[type_args]:
+                self.is_type_field = True
+
             self.type = type_args[0]
         else:
             self.optional = False
@@ -85,6 +90,10 @@ class FieldInfo:
     @property
     def is_container_of_builtin(self) -> bool:
         return self.container and self.type.__module__ == 'builtins'
+
+    @property
+    def is_type_type(self) -> bool:
+        return self.is_type_field
 
     @cached_property
     def column(self) -> Column:
