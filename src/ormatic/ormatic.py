@@ -41,11 +41,6 @@ class ORMatic:
     The postfix that will be added to foreign key columns (not the relationships).
     """
 
-    polymorphic_union: Dict[str, Table]
-    """
-    Dictionary that maps the polymorphic identifier to the table in inheritance structures.
-    """
-
     class_dependency_graph: Optional[nx.DiGraph] = None
     """
     A direct acyclic graph containing the class hierarchy.
@@ -60,8 +55,8 @@ class ORMatic:
         #  initialize the instance variables
         self.type_mappings = type_mappings or {}
         self.mapper_registry = mapper_registry
-        self.polymorphic_union = {}
         self.class_dict = {}
+
 
         # create the class dependency graph
         self.make_class_dependency_graph(classes)
@@ -95,6 +90,8 @@ class ORMatic:
         self.class_dependency_graph = nx.DiGraph()
 
         for clazz in classes:
+            if issubclass(clazz, ORMaticExplicitMapping):
+                clazz = clazz.explicit_mapping
             self.class_dependency_graph.add_node(clazz)
 
             for base in clazz.__bases__:
@@ -161,7 +158,9 @@ class ORMatic:
             logger.info(f"Parsing as custom type mapping.")
             self.create_custom_type_column(wrapped_table, field_info)
         elif not field_info.container and (
-                field_info.type in self.class_dict or field_info.type in self.type_mappings.keys()):
+                field_info.type in self.class_dict
+                or field_info.type in self.type_mappings.keys()
+        ):
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(wrapped_table, field_info)
         elif field_info.container:
@@ -189,6 +188,9 @@ class ORMatic:
 
         fk_name = f"{field_info.name}{self.foreign_key_postfix}"
 
+        # other_wrapped_table = self.explicitly_mapped_classes.get(field_info.type)
+        # if other_wrapped_table is None:
+        #     other_wrapped_table = self.class_dict[field_info.type]
         other_wrapped_table = self.class_dict[field_info.type]
 
         # create a foreign key to field.type

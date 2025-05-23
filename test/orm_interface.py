@@ -64,11 +64,12 @@ t_Position4D = Table(
     Column('w', Float, nullable=False)
 )
 
-t_SimulatedObject = Table(
-    'SimulatedObject', metadata,
+t_OriginalSimulatedObject = Table(
+    'OriginalSimulatedObject', metadata,
     Column('id', Integer, primary_key=True),
     Column('concept', PhysicalObjectType, nullable=False),
-    Column('pose_id', ForeignKey('Pose.id'), nullable=False)
+    Column('pose_id', ForeignKey('Pose.id'), nullable=False),
+    Column('placeholder', Float, nullable=False)
 )
 
 mapper_registry = registry(metadata=metadata)
@@ -86,8 +87,8 @@ m_EnumContainer = mapper_registry.map_imperatively(classes.example_classes.EnumC
 
 m_Node = mapper_registry.map_imperatively(classes.example_classes.Node, t_Node, properties = dict(parent=relationship('Node',foreign_keys=[t_Node.c.parent_id])))
 
-m_SimulatedObject = mapper_registry.map_imperatively(classes.example_classes.OriginalSimulatedObject, t_SimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_SimulatedObject.c.pose_id]), 
-concept=t_SimulatedObject.c.concept))
+m_OriginalSimulatedObject = mapper_registry.map_imperatively(classes.example_classes.OriginalSimulatedObject, t_OriginalSimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_OriginalSimulatedObject.c.pose_id]), 
+concept=t_OriginalSimulatedObject.c.concept))
 
 m_DoublePositionAggregator = mapper_registry.map_imperatively(classes.example_classes.DoublePositionAggregator, t_DoublePositionAggregator, properties = dict(positions1=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions1_id]), 
 positions2=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions2_id])))

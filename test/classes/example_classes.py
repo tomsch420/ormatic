@@ -177,3 +177,9 @@ class PhysicalObjectType(types.TypeDecorator):
     def copy(self, **kw):
         return self.__class__(**kw)
 
+@dataclass
+class ObjectAnnotation:
+    """
+    Class for checking how classes that are explicitly mapped interact with original types.
+    """
+    object_reference: OriginalSimulatedObject

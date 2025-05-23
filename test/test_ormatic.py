@@ -7,8 +7,8 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import registry, Session, clear_mappers
 
 import ormatic
-from ormatic.ormatic import ORMatic
 from classes.example_classes import *
+from ormatic.ormatic import ORMatic
 
 
 class ORMaticTestCase(unittest.TestCase):
@@ -151,13 +151,11 @@ class ORMaticTestCase(unittest.TestCase):
 
         positions = DoublePositionAggregator([p1, p2], [p3])
 
-
         self.session.add(positions)
         self.session.commit()
 
         queried = self.session.scalars(select(DoublePositionAggregator)).one()
         self.assertEqual(positions, queried)
-
 
     def test_inheritance(self):
         classes = [Position, Position4D, Position5D]
@@ -210,7 +208,8 @@ class ORMaticTestCase(unittest.TestCase):
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject, DoublePositionAggregator]
+        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject,
+                   DoublePositionAggregator]
         ormatic = ORMatic(classes, self.mapper_registry, {PhysicalObject: PhysicalObjectType()})
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -261,7 +260,7 @@ class ORMaticTestCase(unittest.TestCase):
 
         self.mapper_registry.metadata.create_all(self.session.bind)
 
-        obj1 = OriginalSimulatedObject(Bowl(), Pose(Position(0,0,0), Orientation(0,0,0,1)), 5)
+        obj1 = OriginalSimulatedObject(Bowl(), Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)), 5)
         self.session.add(obj1)
         self.session.commit()
         result = self.session.scalar(select(OriginalSimulatedObject))
@@ -272,12 +271,13 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result.concept, obj1.concept)
 
         with self.session.bind.connect() as connection:
-            result = connection.execute(text("select * from SimulatedObject JOIN Pose ON SimulatedObject.pose_id = Pose.id"))
+            result = connection.execute(
+                text("select * from OriginalSimulatedObject JOIN Pose ON OriginalSimulatedObject.pose_id = Pose.id"))
             store_rows = []
             for row in result:
                 store_rows.append(row)
 
-        self.assertEqual(len(store_rows[0]), 6)
+        self.assertEqual(len(store_rows[0]), 7)
         self.assertEqual(type(store_rows[0][1]), str)
 
     def test_type_type(self):
@@ -292,6 +292,23 @@ class ORMaticTestCase(unittest.TestCase):
         result = self.session.scalars(select(PositionTypeWrapper)).one()
         self.assertEqual(result, wrapper)
 
+    def test_explicit_mapping_reference(self):
+        classes = [ObjectAnnotation, SimulatedObject, Pose, Position, Orientation]
+        ormatic = ORMatic(classes, self.mapper_registry, type_mappings={PhysicalObject: PhysicalObjectType()})
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        object_annotation = ObjectAnnotation(OriginalSimulatedObject(Bowl(),
+                                                                     Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)),
+                                                                     5.))
+        self.session.add(object_annotation)
+        self.session.commit()
+
+        r = self.session.scalars(select(OriginalSimulatedObject)).one()
+        self.assertEqual(r, object_annotation.object_reference)
+
+        r = self.session.scalars(select(ObjectAnnotation)).one()
+        self.assertIsNotNone(r.object_reference)
 
 
 if __name__ == '__main__':
