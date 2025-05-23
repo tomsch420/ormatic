@@ -141,13 +141,13 @@ class ORMatic:
         logger.info("=" * 80)
         logger.info(f"Processing Field {wrapped_table.clazz.__name__}.{f.name}: {f.type}.")
 
-        field_info = FieldInfo(wrapped_table.clazz, f)
-
         if f.name.startswith("_"):
             logger.info(f"Skipping.")
             return
 
-        elif field_info.is_type_type:
+        field_info = FieldInfo(wrapped_table.clazz, f)
+
+        if field_info.is_type_type:
             logger.info(f"Parsing as type.")
             type_type = TypeType
             column = Column(field_info.name, type_type)
@@ -192,21 +192,19 @@ class ORMatic:
         other_wrapped_table = self.class_dict[field_info.type]
 
         # create a foreign key to field.type
-        column = sqlalchemy.Column(fk_name, Integer,
-                                   sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name),
+        column = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name),
                                    nullable=field_info.optional)
         wrapped_table.columns.append(column)
 
         # if it is an ordinary one-to-one relationship
         if wrapped_table.clazz != other_wrapped_table.clazz:
-            relationship_ = sqlalchemy.orm.relationship(other_wrapped_table.clazz,
-                                                        foreign_keys=[column])
+            relationship_ = sqlalchemy.orm.relationship(other_wrapped_table.clazz, foreign_keys=[column])
             relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info,
                                                  foreign_key_name=fk_name)
         else:
             # handle self-referencing relationship
-            relationship_ = sqlalchemy.orm.relationship(wrapped_table.clazz,
-                                                        remote_side=[wrapped_table.primary_key], foreign_keys=[column])
+            relationship_ = sqlalchemy.orm.relationship(wrapped_table.clazz, remote_side=[wrapped_table.primary_key],
+                                                        foreign_keys=[column])
 
             relationship_info = RelationshipInfo(relationship=relationship_, field_info=field_info,
                                                  foreign_key_name=fk_name)
@@ -476,7 +474,7 @@ class WrappedTable:
             clazz = self.clazz.explicit_mapping
         else:
             clazz = self.clazz
-
+        print(self)
         table = self.mapper_registry.map_imperatively(clazz, table, **self.mapper_kwargs)
         return table
 
