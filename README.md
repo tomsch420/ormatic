@@ -9,6 +9,7 @@ When designing the dataclasses there are a couple of rules that need to be follo
 - Iterables are never optional and never nested. 
 If you want an optional iterable, use an empty iterable as default factory instead.
 - No multiple inheritance.
+- No forward referenced classes.
 
 Features:
 - Automatic conversion of dataclasses to sqlalchemy tables.
