@@ -1,8 +1,8 @@
-from ormatic.example import PhysicalObjectType
+from classes.example_classes import PhysicalObjectType
 
 from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, JSON, MetaData, String, Table
 from sqlalchemy.orm import RelationshipProperty, registry, relationship
-import ormatic.example
+import classes.example_classes
 
 metadata = MetaData()
 
@@ -15,7 +15,7 @@ t_DoublePositionAggregator = Table(
 t_EnumContainer = Table(
     'EnumContainer', metadata,
     Column('id', Integer, primary_key=True),
-    Column('value', Enum(ormatic.example.ValueEnum), nullable=False)
+    Column('value', Enum(classes.example_classes.ValueEnum), nullable=False)
 )
 
 t_Node = Table(
@@ -73,23 +73,23 @@ t_SimulatedObject = Table(
 
 mapper_registry = registry(metadata=metadata)
 
-m_Position = mapper_registry.map_imperatively(ormatic.example.Position, t_Position, polymorphic_on = "polymorphic_type", polymorphic_identity = "Position")
+m_Position = mapper_registry.map_imperatively(classes.example_classes.Position, t_Position, polymorphic_on = "polymorphic_type", polymorphic_identity = "Position")
 
-m_Orientation = mapper_registry.map_imperatively(ormatic.example.Orientation, t_Orientation, )
+m_Orientation = mapper_registry.map_imperatively(classes.example_classes.Orientation, t_Orientation, )
 
-m_Pose = mapper_registry.map_imperatively(ormatic.example.Pose, t_Pose, properties = dict(position=relationship('Position',foreign_keys=[t_Pose.c.position_id]), 
+m_Pose = mapper_registry.map_imperatively(classes.example_classes.Pose, t_Pose, properties = dict(position=relationship('Position',foreign_keys=[t_Pose.c.position_id]), 
 orientation=relationship('Orientation',foreign_keys=[t_Pose.c.orientation_id])))
 
-m_Positions = mapper_registry.map_imperatively(ormatic.example.Positions, t_Positions, properties = dict(positions=relationship('Position',foreign_keys=[t_Position.c.positions_positions_id])))
+m_Positions = mapper_registry.map_imperatively(classes.example_classes.Positions, t_Positions, properties = dict(positions=relationship('Position',foreign_keys=[t_Position.c.positions_positions_id])))
 
-m_EnumContainer = mapper_registry.map_imperatively(ormatic.example.EnumContainer, t_EnumContainer, )
+m_EnumContainer = mapper_registry.map_imperatively(classes.example_classes.EnumContainer, t_EnumContainer, )
 
-m_Node = mapper_registry.map_imperatively(ormatic.example.Node, t_Node, properties = dict(parent=relationship('Node',foreign_keys=[t_Node.c.parent_id])))
+m_Node = mapper_registry.map_imperatively(classes.example_classes.Node, t_Node, properties = dict(parent=relationship('Node',foreign_keys=[t_Node.c.parent_id])))
 
-m_SimulatedObject = mapper_registry.map_imperatively(ormatic.example.OriginalSimulatedObject, t_SimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_SimulatedObject.c.pose_id]), 
+m_SimulatedObject = mapper_registry.map_imperatively(classes.example_classes.OriginalSimulatedObject, t_SimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_SimulatedObject.c.pose_id]), 
 concept=t_SimulatedObject.c.concept))
 
-m_DoublePositionAggregator = mapper_registry.map_imperatively(ormatic.example.DoublePositionAggregator, t_DoublePositionAggregator, properties = dict(positions1=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions1_id]), 
+m_DoublePositionAggregator = mapper_registry.map_imperatively(classes.example_classes.DoublePositionAggregator, t_DoublePositionAggregator, properties = dict(positions1=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions1_id]), 
 positions2=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions2_id])))
 
-m_Position4D = mapper_registry.map_imperatively(ormatic.example.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)
+m_Position4D = mapper_registry.map_imperatively(classes.example_classes.Position4D, t_Position4D, polymorphic_identity = "Position4D", inherits = m_Position)

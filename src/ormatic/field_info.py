@@ -59,6 +59,7 @@ class FieldInfo:
 
         self.name = f.name
         self.clazz = clazz
+
         type_hints = get_type_hints(clazz)[self.name]
         type_args = typing.get_args(type_hints)
 
@@ -123,6 +124,7 @@ class RelationshipInfo:
     @property
     def is_one_to_one(self) -> bool:
         return self.field_info.container is None
+
 
 @dataclass
 class CustomTypeInfo:

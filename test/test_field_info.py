@@ -1,8 +1,8 @@
 import unittest
 from dataclasses import fields
 
-from ormatic.example import *
 from ormatic.ormatic import FieldInfo
+from classes.example_classes import *
 
 
 def get_field_by_name(cls, name):

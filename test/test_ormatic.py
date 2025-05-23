@@ -6,9 +6,9 @@ import sqlacodegen.generators
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import registry, Session, clear_mappers
 
-import ormatic.example
-from ormatic.example import *
+import ormatic
 from ormatic.ormatic import ORMatic
+from classes.example_classes import *
 
 
 class ORMaticTestCase(unittest.TestCase):
@@ -291,6 +291,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.session.commit()
         result = self.session.scalars(select(PositionTypeWrapper)).one()
         self.assertEqual(result, wrapper)
+
 
 
 if __name__ == '__main__':

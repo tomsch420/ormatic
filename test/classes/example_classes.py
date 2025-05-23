@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
-from sqlalchemy import Column, types
+from sqlalchemy import types
 from typing_extensions import List, Optional, Type
 
 from ormatic.utils import ORMaticExplicitMapping, classproperty

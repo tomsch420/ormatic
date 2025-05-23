@@ -474,7 +474,7 @@ class WrappedTable:
             clazz = self.clazz.explicit_mapping
         else:
             clazz = self.clazz
-        print(self)
+
         table = self.mapper_registry.map_imperatively(clazz, table, **self.mapper_kwargs)
         return table
 

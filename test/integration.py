@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from ormatic.example import *
 from orm_interface import *
 
 engine = create_engine('sqlite:///:memory:')

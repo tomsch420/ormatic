@@ -37,8 +37,9 @@ import sqlacodegen.generators
 from sqlalchemy import create_engine
 from sqlalchemy.orm import registry, Session
 
-from ormatic.example import *
+from example import *
 from ormatic.ormatic import ORMatic
+
 
 def main():
     mapper_registry = registry()
