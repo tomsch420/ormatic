@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing_extensions import Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 

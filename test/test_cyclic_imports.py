@@ -16,7 +16,7 @@ from ormatic.ormatic import ORMatic
 
 
 
-@unittest.skip("Forward referenced types are not supported yet.")
+# @unittest.skip("Forward referenced types are not supported yet.")
 class UnfinishedTypeTestCase(unittest.TestCase):
     session: Session
     mapper_registry: registry

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import inspect
+import sys
 from dataclasses import dataclass
-from typing import Type
+from typing import Type, List
 from sqlalchemy import types
 
 
@@ -17,6 +19,26 @@ class classproperty:
     def __get__(self, instance, owner):
         return self.fget(owner)
 
+def classes_of_module(module) -> List[Type]:
+    """
+    Get all classes of a given module.
+
+    :param module: The module to inspect.
+    :return: All classes of the given module.
+    """
+
+    result = []
+    for name, obj in inspect.getmembers(sys.modules[module.__name__]):
+        if inspect.isclass(obj) and obj.__module__ == module.__name__:
+            result.append(obj)
+    return result
+
+def recursive_subclasses(cls):
+    """
+    :param cls: The class.
+    :return: A list of the classes subclasses.
+    """
+    return cls.__subclasses__() + [g for s in cls.__subclasses__() for g in recursive_subclasses(s)]
 
 @dataclass
 class ORMaticExplicitMapping:

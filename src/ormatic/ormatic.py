@@ -57,7 +57,6 @@ class ORMatic:
         self.mapper_registry = mapper_registry
         self.class_dict = {}
 
-
         # create the class dependency graph
         self.make_class_dependency_graph(classes)
 
@@ -91,7 +90,7 @@ class ORMatic:
 
         for clazz in classes:
             if issubclass(clazz, ORMaticExplicitMapping):
-                clazz = clazz.explicit_mapping
+                clazz = clazz  # .explicit_mapping
             self.class_dependency_graph.add_node(clazz)
 
             for base in clazz.__bases__:
@@ -367,6 +366,8 @@ class WrappedTable:
 
     @property
     def tablename(self):
+        if issubclass(self.clazz, ORMaticExplicitMapping):
+            return self.clazz.explicit_mapping.__name__
         return self.clazz.__name__
 
     @property

@@ -7,8 +7,11 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import registry, Session, clear_mappers
 
 import ormatic
+import classes.example_classes
+from classes import example_classes
 from classes.example_classes import *
 from ormatic.ormatic import ORMatic
+from ormatic.utils import classes_of_module, recursive_subclasses
 
 
 class ORMaticTestCase(unittest.TestCase):
@@ -208,8 +211,15 @@ class ORMaticTestCase(unittest.TestCase):
         self.mapper_registry.metadata.create_all(self.session.bind)
 
     def test_to_python_file(self):
-        classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node, SimulatedObject,
-                   DoublePositionAggregator]
+        classes = classes_of_module(example_classes)
+
+        ignore_classes = {PhysicalObject, PhysicalObjectType} | set(recursive_subclasses(PhysicalObject))
+        ignore_classes |= {cls.explicit_mapping for cls in recursive_subclasses(ORMaticExplicitMapping)}
+        ignore_classes |= {OriginalSimulatedObject}
+        ignore_classes |= set(recursive_subclasses(Enum))
+
+        classes = list(set(classes) - ignore_classes)
+
         ormatic = ORMatic(classes, self.mapper_registry, {PhysicalObject: PhysicalObjectType()})
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -300,7 +310,7 @@ class ORMaticTestCase(unittest.TestCase):
 
         object_annotation = ObjectAnnotation(OriginalSimulatedObject(Bowl(),
                                                                      Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)),
-                                                                     5.))
+                                                                     5., {"a": "b"}))
         self.session.add(object_annotation)
         self.session.commit()
 

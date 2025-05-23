@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Dict
 
 from sqlalchemy import types
 from typing_extensions import List, Optional, Type
@@ -143,6 +144,8 @@ class OriginalSimulatedObject:
     concept: PhysicalObject
     pose: Pose
     placeholder: float
+
+    something_not_parsed: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
