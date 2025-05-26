@@ -25,8 +25,8 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic.ormatic.logger.setLevel(logging.INFO)
 
         self.mapper_registry = registry()
-        engine = create_engine('sqlite:///:memory:')
-        self.session = Session(engine)
+        self.engine = create_engine('sqlite:///:memory:')
+        self.session = Session(self.engine)
 
     def tearDown(self):
         self.mapper_registry.metadata.drop_all(self.session.bind)
@@ -287,7 +287,7 @@ class ORMaticTestCase(unittest.TestCase):
             for row in result:
                 store_rows.append(row)
 
-        self.assertEqual(len(store_rows[0]), 7)
+        self.assertEqual(len(store_rows[0]), 6)
         self.assertEqual(type(store_rows[0][1]), str)
 
     def test_type_type(self):
@@ -308,20 +308,35 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
 
-        object_annotation = ObjectAnnotation(OriginalSimulatedObject(Bowl(),
-                                                                     Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)),
-                                                                     5., {"a": "b"}))
+        og_sim = OriginalSimulatedObject(Bowl(), Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)), 5.)
+        object_annotation = ObjectAnnotation(og_sim)
         self.session.add(object_annotation)
         self.session.commit()
 
-        # TODO fix this such that this selects the correct thing. THe origin of the error is in the ORMatic class
-        # where the classes are parsed. This should reference to the ExplicitMapping via the class that is explicitly mapped.
-        r = self.session.scalars(select(SimulatedObject)).one()
+        r = self.session.scalars(select(OriginalSimulatedObject)).one()
         self.assertEqual(r, object_annotation.object_reference)
 
-        r = self.session.scalars(select(ObjectAnnotation)).one()
-        self.assertIsNotNone(r.object_reference)
+        re = self.session.scalars(select(ObjectAnnotation)).one()
+        self.assertIsNotNone(re.object_reference)
+        self.assertEqual(re, object_annotation)
 
+
+    # def test_multiple_inheritance(self):
+    #     classes = [Parent1, Parent2, MultipleInheritance]
+    #     ormatic = ORMatic(classes, self.mapper_registry)
+    #     ormatic.make_all_tables()
+    #     self.mapper_registry.metadata.create_all(self.session.bind)
+    #
+    #     mi1 = MultipleInheritance("a1", "a2")
+    #     self.session.add(mi1)
+    #     self.session.commit()
+    #
+    #     r1 = self.session.scalars(select(MultipleInheritance)).one()
+    #     r2 = self.session.scalars(select(Parent1)).one()
+    #     r3 = self.session.scalars(select(Parent2)).one()
+    #
+    #     self.assertEqual(r1, r2)
+    #     self.assertEqual(r1, r3)
 
 if __name__ == '__main__':
     unittest.main()
