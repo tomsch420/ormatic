@@ -139,13 +139,28 @@ class Cup(PhysicalObject):
 class Bowl(PhysicalObject):
     pass
 
+# @dataclass
+# class Parent1:
+#     obj: str
+#
+#
+# @dataclass
+# class Parent2:
+#     obj2: str
+#
+#
+# @dataclass
+# class MultipleInheritance(Parent1, Parent2):
+#     pass
+
+
 @dataclass
 class OriginalSimulatedObject:
     concept: PhysicalObject
     pose: Pose
-    placeholder: float
+    placeholder: float = field(default=0)
 
-    something_not_parsed: Dict[str, str] = field(default_factory=dict)
+    something_not_parsed: Dict[str, str] = field(default=None)
 
 
 @dataclass
