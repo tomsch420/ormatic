@@ -9,7 +9,7 @@ class TypeType(TypeDecorator):
     Type that casts fields that are of type `type` to their class name on serialization and converts the name
     to the class itself through the globals on load.
     """
-    impl = types.String
+    impl = types.String(256)
 
     def process_bind_param(self, value: Type, dialect):
         return value.__module__ + "." + value.__name__
