@@ -158,7 +158,7 @@ def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:
     elif t == float:
         return sqlalchemy.Float
     elif t == str:
-        return sqlalchemy.String(256)
+        return sqlalchemy.String(255)
     elif t == bool:
         return sqlalchemy.Boolean
     elif t == datetime:

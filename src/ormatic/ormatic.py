@@ -7,7 +7,13 @@ from typing import Any
 from typing import TextIO
 
 import networkx as nx
-import sqlacodegen.generators
+
+try:
+    import sqlacodegen.generators
+except ImportError:
+    logging.warn("sqlacodegen is not available. Writing the ORMatic to python files will not be available.")
+    sqlacodegen = None
+
 import sqlalchemy
 from sqlalchemy import Table, Integer, Column, ForeignKey, JSON
 from sqlalchemy.orm import relationship, registry, Mapper
@@ -482,7 +488,7 @@ class WrappedTable:
 
         columns = [self.primary_key] + self.columns
         if self.is_root_of_non_empty_inheritance_structure:
-            columns.append(Column(self.polymorphic_on_name, sqlalchemy.String))
+            columns.append(Column(self.polymorphic_on_name, sqlalchemy.String(255)))
 
         table = Table(self.tablename, self.mapper_registry.metadata, *columns, )
 
