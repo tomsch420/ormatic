@@ -320,6 +320,14 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertIsNotNone(re.object_reference)
         self.assertEqual(re, object_annotation)
 
+    def test_explicit_mapping_inheritance(self):
+        classes = [SimulatedObject, Pose, Position, Orientation, OGSimObjSubclass, ]
+        ormatic = ORMatic(classes, self.mapper_registry, type_mappings={PhysicalObject: PhysicalObjectType()})
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        og_sim_obj_sub = ormatic.class_dict[OGSimObjSubclass].mapped_table.local_table
+        self.assertEqual(len(og_sim_obj_sub.columns), 3) #pose, concept, id (based on the explicit mapping)
 
     # def test_multiple_inheritance(self):
     #     classes = [Parent1, Parent2, MultipleInheritance]
