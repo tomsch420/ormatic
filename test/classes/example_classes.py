@@ -160,7 +160,7 @@ class OriginalSimulatedObject:
     pose: Pose
     placeholder: float = field(default=0)
 
-    something_not_parsed: Dict[str, str] = field(default=None)
+    # something_not_parsed: Dict[str, str] = field(default=None)
 
 
 @dataclass
@@ -171,6 +171,11 @@ class SimulatedObject(ORMaticExplicitMapping):
     @classproperty
     def explicit_mapping(cls):
         return OriginalSimulatedObject
+
+
+@dataclass
+class OGSimObjSubclass(OriginalSimulatedObject):
+    pass
 
 
 class PhysicalObjectType(types.TypeDecorator):
