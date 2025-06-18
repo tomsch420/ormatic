@@ -229,9 +229,6 @@ class ORMaticTestCase(unittest.TestCase):
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
 
-        # with open('orm_interface.py', 'r') as f:
-        #     exec(f.read())
-
     def test_molecule(self):
         classes = [Atom, Bond, Molecule]
         ormatic = ORMatic(classes, self.mapper_registry)
@@ -328,6 +325,19 @@ class ORMaticTestCase(unittest.TestCase):
 
         og_sim_obj_sub = ormatic.class_dict[OGSimObjSubclass].mapped_table.local_table
         self.assertEqual(len(og_sim_obj_sub.columns), 3) #pose, concept, id (based on the explicit mapping)
+
+        og_sim = OGSimObjSubclass(Bowl(), Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)))
+        self.session.add(og_sim)
+        self.session.commit()
+
+        r = self.session.scalars(select(OGSimObjSubclass)).one()
+        self.assertEqual(r, og_sim)
+        self.assertIsInstance(r.concept, Bowl)
+        self.assertEqual(r.concept, og_sim.concept)
+        self.assertEqual(r.pose, og_sim.pose)
+        self.assertEqual(r.pose.position, og_sim.pose.position)
+        self.assertEqual(r.pose.orientation, og_sim.pose.orientation)
+        self.assertEqual(r.pose.orientation.w, 1)
 
     # def test_multiple_inheritance(self):
     #     classes = [Parent1, Parent2, MultipleInheritance]
