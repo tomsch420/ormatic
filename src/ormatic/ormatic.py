@@ -52,9 +52,9 @@ class ORMatic:
     A direct acyclic graph containing the class hierarchy.
     """
 
-    explicitly_mapped_classes: list = None
+    explicitly_mapped_classes: dict = None
     """
-    A list of classes that are explicitly mapped to SQLAlchemy tables.
+    A dict of classes that are explicitly mapped to SQLAlchemy tables.
     """
 
     def __init__(self, classes: List[Type], mapper_registry: registry, type_mappings: Dict[Type, Any] = None):
@@ -67,7 +67,7 @@ class ORMatic:
         self.type_mappings = type_mappings or {}
         self.mapper_registry = mapper_registry
         self.class_dict = {}
-        self.explicitly_mapped_classes = []
+        self.explicitly_mapped_classes = {}
 
         # create the class dependency graph
         self.make_class_dependency_graph(classes)
@@ -103,7 +103,8 @@ class ORMatic:
         for clazz in classes:
             if issubclass(clazz, ORMaticExplicitMapping):
                 clazz_explicit = clazz.explicit_mapping
-                self.explicitly_mapped_classes.append(clazz_explicit)
+                # TODO duplicate check
+                self.explicitly_mapped_classes[clazz_explicit] = clazz
                 self.class_dependency_graph.add_node(clazz_explicit)
             self.class_dependency_graph.add_node(clazz)
 
@@ -118,14 +119,14 @@ class ORMatic:
         :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
         """
         return {wrapped_table.clazz: wrapped_table.mapped_table for wrapped_table in self.class_dict.values()
-                if wrapped_table.clazz not in self.explicitly_mapped_classes}
+                if wrapped_table.clazz not in self.explicitly_mapped_classes.keys()}
 
     def parse_classes(self):
         """
         Parse all the classes in the class_dict, aggregating the columns, primary keys, foreign keys and relationships.
         """
         for wrapped_table in self.class_dict.values():
-            if wrapped_table.clazz in self.explicitly_mapped_classes:
+            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
                 continue
             self.parse_class(wrapped_table)
 
@@ -136,8 +137,10 @@ class ORMatic:
         :param wrapped_table: The WrappedTable object to parse
         """
         for f in fields(wrapped_table.clazz):
-
             if wrapped_table.parent_class and f in fields(wrapped_table.parent_class.clazz):
+                continue
+            elif wrapped_table.clazz.__bases__ and wrapped_table.clazz.__bases__[0] in self.explicitly_mapped_classes.keys() \
+                    and f.name not in{fld.name for fld in fields(self.explicitly_mapped_classes[wrapped_table.clazz.__bases__[0]])}:
                 continue
 
             self.parse_field(wrapped_table, f)
@@ -299,7 +302,7 @@ class ORMatic:
 
         # write imperative mapping calls
         for wrapped_table in self.class_dict.values():
-            if wrapped_table.clazz in self.explicitly_mapped_classes:
+            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
                 continue
             file.write("\n")
 
