@@ -229,9 +229,6 @@ class ORMaticTestCase(unittest.TestCase):
         with open('orm_interface.py', 'w') as f:
             ormatic.to_python_file(generator, f)
 
-        # with open('orm_interface.py', 'r') as f:
-        #     exec(f.read())
-
     def test_molecule(self):
         classes = [Atom, Bond, Molecule]
         ormatic = ORMatic(classes, self.mapper_registry)
@@ -329,22 +326,23 @@ class ORMaticTestCase(unittest.TestCase):
         og_sim_obj_sub = ormatic.class_dict[OGSimObjSubclass].mapped_table.local_table
         self.assertEqual(len(og_sim_obj_sub.columns), 3) #pose, concept, id (based on the explicit mapping)
 
-    # def test_multiple_inheritance(self):
-    #     classes = [Parent1, Parent2, MultipleInheritance]
-    #     ormatic = ORMatic(classes, self.mapper_registry)
-    #     ormatic.make_all_tables()
-    #     self.mapper_registry.metadata.create_all(self.session.bind)
-    #
-    #     mi1 = MultipleInheritance("a1", "a2")
-    #     self.session.add(mi1)
-    #     self.session.commit()
-    #
-    #     r1 = self.session.scalars(select(MultipleInheritance)).one()
-    #     r2 = self.session.scalars(select(Parent1)).one()
-    #     r3 = self.session.scalars(select(Parent2)).one()
-    #
-    #     self.assertEqual(r1, r2)
-    #     self.assertEqual(r1, r3)
+    @unittest.skip("Multiple inheritance is not supported yet")
+    def test_multiple_inheritance(self):
+        classes = [Parent1, Parent2, MultipleInheritance]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        mi1 = MultipleInheritance("a1", "a2")
+        self.session.add(mi1)
+        self.session.commit()
+
+        r1 = self.session.scalars(select(MultipleInheritance)).all()
+        r2 = self.session.scalars(select(Parent1)).all()
+        r3 = self.session.scalars(select(Parent2)).all()
+
+        self.assertEqual(r1, r2)
+        self.assertEqual(r1, r3)
 
 if __name__ == '__main__':
     unittest.main()
