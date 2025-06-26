@@ -139,19 +139,19 @@ class Cup(PhysicalObject):
 class Bowl(PhysicalObject):
     pass
 
-# @dataclass
-# class Parent1:
-#     obj: str
-#
-#
-# @dataclass
-# class Parent2:
-#     obj2: str
-#
-#
-# @dataclass
-# class MultipleInheritance(Parent1, Parent2):
-#     pass
+@dataclass
+class Parent1:
+    obj: str
+
+
+@dataclass
+class Parent2:
+    obj2: str
+
+
+@dataclass
+class MultipleInheritance(Parent1, Parent2):
+    pass
 
 
 @dataclass

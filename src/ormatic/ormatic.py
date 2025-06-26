@@ -78,7 +78,7 @@ class ORMatic:
             # get the inheritance tree
             bases: List[Type] = [base for (base, _) in self.class_dependency_graph.in_edges(clazz)]
             if len(bases) > 1:
-                raise ParseError(f"Multiple inheritance is not supported. {clazz} has multiple mapped bases: {bases}")
+                logger.warning(f"Class {clazz.__name__} has multiple inheritance.")
 
             base = self.class_dict[bases[0]] if bases else None
 

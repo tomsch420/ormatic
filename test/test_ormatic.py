@@ -339,22 +339,23 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(r.pose.orientation, og_sim.pose.orientation)
         self.assertEqual(r.pose.orientation.w, 1)
 
-    # def test_multiple_inheritance(self):
-    #     classes = [Parent1, Parent2, MultipleInheritance]
-    #     ormatic = ORMatic(classes, self.mapper_registry)
-    #     ormatic.make_all_tables()
-    #     self.mapper_registry.metadata.create_all(self.session.bind)
-    #
-    #     mi1 = MultipleInheritance("a1", "a2")
-    #     self.session.add(mi1)
-    #     self.session.commit()
-    #
-    #     r1 = self.session.scalars(select(MultipleInheritance)).one()
-    #     r2 = self.session.scalars(select(Parent1)).one()
-    #     r3 = self.session.scalars(select(Parent2)).one()
-    #
-    #     self.assertEqual(r1, r2)
-    #     self.assertEqual(r1, r3)
+    @unittest.skip("Multiple inheritance is not supported yet")
+    def test_multiple_inheritance(self):
+        classes = [Parent1, Parent2, MultipleInheritance]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        mi1 = MultipleInheritance("a1", "a2")
+        self.session.add(mi1)
+        self.session.commit()
+
+        r1 = self.session.scalars(select(MultipleInheritance)).all()
+        r2 = self.session.scalars(select(Parent1)).all()
+        r3 = self.session.scalars(select(Parent2)).all()
+
+        self.assertEqual(r1, r2)
+        self.assertEqual(r1, r3)
 
 if __name__ == '__main__':
     unittest.main()
