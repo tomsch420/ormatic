@@ -76,7 +76,7 @@ class FieldInfo:
         # try to unpack the type if it is a nested type
         if len(type_args) > 0:
             if len(type_args) > 2:
-                raise ParseError(f"Could not parse field {f}. Too many type arguments.")
+                raise ParseError(f"Could not parse field {f} of class {clazz}. Too many type arguments.")
 
             self.optional = NoneType in type_args
 

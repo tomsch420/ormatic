@@ -255,7 +255,7 @@ class ORMatic:
             wrapped_table.columns.append(column)
 
         else:
-            raise ParseError(f"Could not parse iterable field {field}")
+            logger.info(f"Could not parse iterable field {field_info} of class {wrapped_table.clazz}")
 
     def create_one_to_many_relationship(self, wrapped_table: WrappedTable, field_info: FieldInfo):
         """
