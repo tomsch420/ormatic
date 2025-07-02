@@ -360,6 +360,20 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
 
+    def test_inheritance_partially_mapped(self):
+        classes = [Parent, ChildMapped]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
+        child_mapped = ChildMapped("a", 1)
+        assert child_mapped.name == "a"
+        assert child_mapped.attribute1 == 1
+
+        # This will Fail
+        child_not_mapped = ChildNotMapped("a", 1)
+        assert child_not_mapped.name == "a"
+        assert child_not_mapped.attribute2 == 1
 
 if __name__ == '__main__':
     unittest.main()

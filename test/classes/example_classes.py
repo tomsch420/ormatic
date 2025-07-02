@@ -220,3 +220,16 @@ class Torso(KinematicChain):
     """
     A collection of kinematic chains that are connected to the torso.
     """
+
+@dataclass
+class Parent:
+    name: str
+
+@dataclass
+class ChildMapped(Parent):
+    attribute1: int
+
+@dataclass
+class ChildNotMapped(Parent):
+    attribute2: int
+
