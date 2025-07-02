@@ -141,14 +141,19 @@ class ORMatic:
         """
         result = {}
 
+        # Create a set of classes that are targets of explicit mappings
+        explicit_mapping_targets = set(self.explicitly_mapped_classes.values())
+
         # Add tables from class_dict
         for wrapped_table in self.class_dict.values():
-            if wrapped_table.clazz not in self.explicitly_mapped_classes.keys():
+            # Skip classes that are targets of explicit mappings
+            if wrapped_table.clazz not in explicit_mapping_targets:
                 result[wrapped_table.clazz] = wrapped_table.mapped_table
 
         # Add tables from subclass_dict
         for wrapped_table in self.subclass_dict.values():
-            if wrapped_table.clazz not in self.explicitly_mapped_classes.keys():
+            # Skip classes that are targets of explicit mappings
+            if wrapped_table.clazz not in explicit_mapping_targets:
                 result[wrapped_table.clazz] = wrapped_table.mapped_table
 
         return result
@@ -159,8 +164,7 @@ class ORMatic:
         """
         # Parse classes in the original class_dict
         for wrapped_table in self.class_dict.values():
-            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
-                continue
+            # Parse all classes, including those that implement ORMaticExplicitMapping
             self.parse_class(wrapped_table)
 
         # Do not parse fields for subclasses that are not in the original list
@@ -366,9 +370,18 @@ class WrappedTable:
 
         table = Table(self.tablename, self.mapper_registry.metadata, *columns, )
 
+        # For explicitly mapping classes, we need to decide whether to map to the
+        # explicitly mapping class itself or to its target class
         if issubclass(self.clazz, ORMaticExplicitMapping):
-            clazz = self.clazz.explicit_mapping
+            # If this is an explicitly mapping class and it's in the original classes list,
+            # map the table to the explicitly mapping class itself
+            if self.ormatic and self.clazz in self.ormatic.original_classes:
+                clazz = self.clazz
+            else:
+                # Otherwise, map to the target class
+                clazz = self.clazz.explicit_mapping
         else:
+            # For regular classes, map to the class itself
             clazz = self.clazz
 
         table = self.mapper_registry.map_imperatively(clazz, table, **self.mapper_kwargs)

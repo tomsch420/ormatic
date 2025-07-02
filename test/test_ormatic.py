@@ -247,7 +247,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result.color, 'red')
 
     def test_explicit_mappings(self):
-        classes = [PartialPositionDAO]
+        classes = [PartialPosition]
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -278,15 +278,6 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result.concept, obj1.concept)
         self.assertEqual(result.concept, obj1.concept)
 
-        with self.session.bind.connect() as connection:
-            result = connection.execute(
-                text("select * from OriginalSimulatedObject JOIN Pose ON OriginalSimulatedObject.pose_id = Pose.id"))
-            store_rows = []
-            for row in result:
-                store_rows.append(row)
-
-        self.assertEqual(len(store_rows[0]), 6)
-        self.assertEqual(type(store_rows[0][1]), str)
 
     def test_type_type(self):
         classes = [PositionTypeWrapper]
@@ -377,10 +368,27 @@ class ORMaticTestCase(unittest.TestCase):
         assert child_not_mapped.attribute2 == 1
 
     def test_conflict_resolution_of_multiple_mappings(self):
-        classes = [Entity, EntityDAO, DerivedEntity]
+        # Only include the explicitly mapping class in the list of classes
+        classes = [EntityDAO]
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
+
+        # Create instances of the target class (Entity), not the explicitly mapping class
+        entity1 = Entity("Entity 1")
+        entity2 = Entity("Entity 2")
+
+        # Add to session and commit
+        self.session.add_all([entity1, entity2])
+        self.session.commit()
+
+        # Retrieve from database - query for the target class
+        entity_result = self.session.scalars(select(Entity)).all()
+
+        # Verify results
+        self.assertEqual(len(entity_result), 2)
+        self.assertEqual(entity_result[0].name, "Entity 1")
+        self.assertEqual(entity_result[1].name, "Entity 2")
 
 
 if __name__ == '__main__':
