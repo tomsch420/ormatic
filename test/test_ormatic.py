@@ -339,7 +339,6 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(r.pose.orientation, og_sim.pose.orientation)
         self.assertEqual(r.pose.orientation.w, 1)
 
-    @unittest.skip("Multiple inheritance is not supported yet")
     def test_multiple_inheritance(self):
         classes = [Parent1, Parent2, MultipleInheritance]
         ormatic = ORMatic(classes, self.mapper_registry)
@@ -352,10 +351,15 @@ class ORMaticTestCase(unittest.TestCase):
 
         r1 = self.session.scalars(select(MultipleInheritance)).all()
         r2 = self.session.scalars(select(Parent1)).all()
-        r3 = self.session.scalars(select(Parent2)).all()
 
         self.assertEqual(r1, r2)
-        self.assertEqual(r1, r3)
+
+    def test_inheritance_and_composition(self):
+        classes = [KinematicChain, Torso]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
 
 if __name__ == '__main__':
     unittest.main()

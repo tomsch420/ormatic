@@ -206,3 +206,17 @@ class ObjectAnnotation:
     Class for checking how classes that are explicitly mapped interact with original types.
     """
     object_reference: OriginalSimulatedObject
+
+@dataclass
+class KinematicChain:
+    name: str
+
+@dataclass
+class Torso(KinematicChain):
+    """
+    A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
+    """
+    kinematic_chains: List[KinematicChain] = field(default_factory=list)
+    """
+    A collection of kinematic chains that are connected to the torso.
+    """
