@@ -156,11 +156,8 @@ class ORMatic:
                 continue
             self.parse_class(wrapped_table)
 
-        # Parse classes in the subclass_dict
-        for wrapped_table in self.subclass_dict.values():
-            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
-                continue
-            self.parse_class(wrapped_table)
+        # Do not parse fields for subclasses that are not in the original list
+        # They should only be mapped to tables without any columns
 
     def parse_class(self, wrapped_table: WrappedTable):
         """
@@ -536,23 +533,29 @@ class WrappedTable:
         result = {}
         properties = {}
 
-        for relationship_info in self.one_to_one_relationships:
-            foreign_key_constraint = f"t_{self.tablename}.c.{relationship_info.field_info.name}_id"
-            properties[relationship_info.field_info.name] = (
-                f"relationship('{relationship_info.field_info.type.__name__}',"
-                f"foreign_keys=[{foreign_key_constraint}])")
-
-        for relationship_info in self.one_to_many_relationships:
-            # Get the wrapped table from either class_dict or subclass_dict
-            related_wrapped_table = ormatic.class_dict.get(relationship_info.relationship.argument) or ormatic.subclass_dict.get(relationship_info.relationship.argument)
-            if related_wrapped_table:
-                foreign_key_constraint = f"t_{related_wrapped_table.tablename}.c.{relationship_info.foreign_key_name}"
+        # For subclasses that are not in the original list, return minimal properties
+        if self.clazz in ormatic.subclass_dict and self.clazz not in ormatic.original_classes:
+            # Only include inheritance-related properties
+            pass
+        else:
+            # Process relationships and custom types for original classes
+            for relationship_info in self.one_to_one_relationships:
+                foreign_key_constraint = f"t_{self.tablename}.c.{relationship_info.field_info.name}_id"
                 properties[relationship_info.field_info.name] = (
                     f"relationship('{relationship_info.field_info.type.__name__}',"
                     f"foreign_keys=[{foreign_key_constraint}])")
 
-        for custom_type_info in self.custom_types:
-            properties[custom_type_info.field_info.name] = f"t_{self.tablename}.c.{custom_type_info.field_info.name}"
+            for relationship_info in self.one_to_many_relationships:
+                # Get the wrapped table from either class_dict or subclass_dict
+                related_wrapped_table = ormatic.class_dict.get(relationship_info.relationship.argument) or ormatic.subclass_dict.get(relationship_info.relationship.argument)
+                if related_wrapped_table:
+                    foreign_key_constraint = f"t_{related_wrapped_table.tablename}.c.{relationship_info.foreign_key_name}"
+                    properties[relationship_info.field_info.name] = (
+                        f"relationship('{relationship_info.field_info.type.__name__}',"
+                        f"foreign_keys=[{foreign_key_constraint}])")
+
+            for custom_type_info in self.custom_types:
+                properties[custom_type_info.field_info.name] = f"t_{self.tablename}.c.{custom_type_info.field_info.name}"
 
         if properties:
             result["properties"] = "dict(" + ", \n".join(f"{p}={v}" for p, v in properties.items()) + ")"

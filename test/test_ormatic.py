@@ -217,6 +217,7 @@ class ORMaticTestCase(unittest.TestCase):
         ignore_classes |= {cls.explicit_mapping for cls in recursive_subclasses(ORMaticExplicitMapping)}
         ignore_classes |= {OriginalSimulatedObject}
         ignore_classes |= set(recursive_subclasses(Enum))
+        ignore_classes |= {ChildNotMapped}  # Exclude ChildNotMapped as it has a Dict field that can't be parsed
 
         classes = list(set(classes) - ignore_classes)
 
@@ -371,7 +372,7 @@ class ORMaticTestCase(unittest.TestCase):
         assert child_mapped.attribute1 == 1
 
         # This will Fail
-        child_not_mapped = ChildNotMapped("a", 1)
+        child_not_mapped = ChildNotMapped("a", 1, {1:1})
         assert child_not_mapped.name == "a"
         assert child_not_mapped.attribute2 == 1
 
