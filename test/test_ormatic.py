@@ -247,7 +247,7 @@ class ORMaticTestCase(unittest.TestCase):
         self.assertEqual(result.color, 'red')
 
     def test_explicit_mappings(self):
-        classes = [PartialPosition]
+        classes = [PartialPositionDAO]
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
@@ -375,6 +375,13 @@ class ORMaticTestCase(unittest.TestCase):
         child_not_mapped = ChildNotMapped("a", 1, {1:1})
         assert child_not_mapped.name == "a"
         assert child_not_mapped.attribute2 == 1
+
+    def test_conflict_resolution_of_multiple_mappings(self):
+        classes = [Entity, EntityDAO, DerivedEntity]
+        ormatic = ORMatic(classes, self.mapper_registry)
+        ormatic.make_all_tables()
+        self.mapper_registry.metadata.create_all(self.session.bind)
+
 
 if __name__ == '__main__':
     unittest.main()

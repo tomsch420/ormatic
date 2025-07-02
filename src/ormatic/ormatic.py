@@ -86,7 +86,8 @@ class ORMatic:
             # get the inheritance tree
             bases: List[Type] = [base for (base, _) in self.class_dependency_graph.in_edges(clazz)]
             if len(bases) > 1:
-                logger.warning(f"Class {clazz.__name__} has multiple inheritance.")
+                logger.warning(f"Class {clazz.__name__} has multiple inheritance. "
+                               f"Only the {bases[0].__name__} one will be available for polymorphic selection.")
 
             base = self.class_dict.get(bases[0]) or self.subclass_dict.get(bases[0]) if bases else None
 

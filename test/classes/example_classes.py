@@ -233,3 +233,24 @@ class ChildMapped(Parent):
 class ChildNotMapped(Parent):
     attribute2: int
     unparseable: Dict[int, int]
+
+
+@dataclass
+class Entity:
+    name: str
+
+
+# Define a derived class
+@dataclass
+class DerivedEntity(Entity):
+    description: str = "Default description"
+
+
+# Define an explicit mapping DAO that maps to the base entity class
+@dataclass
+class EntityDAO(ORMaticExplicitMapping):
+    name: str
+
+    @classproperty
+    def explicit_mapping(cls) -> Type:
+        return Entity

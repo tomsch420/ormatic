@@ -8,7 +8,7 @@ import sys
 import typing
 from dataclasses import dataclass, Field
 from datetime import datetime
-from functools import cached_property
+from functools import cached_property, lru_cache
 from types import NoneType
 
 import sqlalchemy
@@ -215,7 +215,11 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
     elif len(found_classes) == 1:
         resolved_class = found_classes[0]
     else:
-        logging.warning(f"Found multiple classes with name {target_class_name}. Found classes: {found_classes} ")
+        warn_multiple_classes(target_class_name, tuple(found_classes))
         resolved_class = found_classes[0]
 
     return resolved_class
+
+@lru_cache(maxsize=None)
+def warn_multiple_classes(target_class_name, found_classes):
+    logging.warning(f"Found multiple classes with name {target_class_name}. Found classes: {found_classes} ")
