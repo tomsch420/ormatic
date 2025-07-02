@@ -268,15 +268,31 @@ class ORMatic:
         """
         child_wrapped_table = self.class_dict[field_info.type]
 
+        # Check if the field type is a parent class of the current class
+        is_parent_class = issubclass(wrapped_table.clazz, field_info.type)
+
         # add a foreign key to the other table describing this table
         fk_name = self.foreign_key_name(field_info)
         fk = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
                                nullable=True)
-        child_wrapped_table.columns.append(fk)
+
+        # Only add the foreign key to the child table if it's not a parent class
+        if not is_parent_class:
+            child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
-        relationship_ = sqlalchemy.orm.relationship(field_info.type, default_factory=field_info.container,
-                                                    foreign_keys=[fk])
+        relationship_kwargs = {
+            "default_factory": field_info.container,
+        }
+
+        if is_parent_class:
+            # For self-referential relationships (when the field type is a parent class)
+            relationship_kwargs["primaryjoin"] = f"{wrapped_table.full_primary_key_name} == foreign({child_wrapped_table.full_primary_key_name})"
+            relationship_kwargs["remote_side"] = [child_wrapped_table.primary_key]
+        else:
+            relationship_kwargs["foreign_keys"] = [fk]
+
+        relationship_ = sqlalchemy.orm.relationship(field_info.type, **relationship_kwargs)
         relationship_info = RelationshipInfo(foreign_key_name=fk_name, relationship=relationship_,
                                              field_info=field_info, )
         wrapped_table.one_to_many_relationships.append(relationship_info)
