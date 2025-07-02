@@ -21,7 +21,7 @@ from typing_extensions import List, Type, Dict, Optional
 
 from .custom_types import TypeType
 from .field_info import ParseError, FieldInfo, RelationshipInfo, CustomTypeInfo
-from .utils import ORMaticExplicitMapping
+from .utils import ORMaticExplicitMapping, recursive_subclasses
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,9 @@ class ORMatic:
         self.type_mappings = type_mappings or {}
         self.mapper_registry = mapper_registry
         self.class_dict = {}
+        self.subclass_dict = {}  # Dictionary for subclasses not in the original list
         self.explicitly_mapped_classes = {}
+        self.original_classes = set(classes)
 
         # create the class dependency graph
         self.make_class_dependency_graph(classes)
@@ -80,12 +82,16 @@ class ORMatic:
             if len(bases) > 1:
                 logger.warning(f"Class {clazz.__name__} has multiple inheritance.")
 
-            base = self.class_dict[bases[0]] if bases else None
+            base = self.class_dict.get(bases[0]) or self.subclass_dict.get(bases[0]) if bases else None
 
             # wrap the classes to aggregate the needed properties before compiling it with sql
-            wrapped_table = WrappedTable(clazz=clazz, mapper_registry=mapper_registry, parent_class=base)
+            wrapped_table = WrappedTable(clazz=clazz, mapper_registry=mapper_registry, parent_class=base, ormatic=self)
 
-            self.class_dict[clazz] = wrapped_table
+            # Add to appropriate dictionary based on whether it's in the original classes
+            if clazz in self.original_classes:
+                self.class_dict[clazz] = wrapped_table
+            else:
+                self.subclass_dict[clazz] = wrapped_table
 
             # add the class to the subclasses of the base class
             if base:
@@ -100,7 +106,15 @@ class ORMatic:
         """
         self.class_dependency_graph = nx.DiGraph()
 
+        # Find all subclasses of the provided classes
+        all_subclasses = set()
         for clazz in classes:
+            all_subclasses.update(recursive_subclasses(clazz))
+
+        # Add all classes and their subclasses to the graph
+        all_classes = set(classes) | all_subclasses
+
+        for clazz in all_classes:
             if issubclass(clazz, ORMaticExplicitMapping):
                 clazz_explicit = clazz.explicit_mapping
                 # TODO duplicate check
@@ -109,23 +123,41 @@ class ORMatic:
             self.class_dependency_graph.add_node(clazz)
 
             for base in clazz.__bases__:
-                if base in classes:
+                if base in all_classes:
                     self.class_dependency_graph.add_edge(base, clazz)
 
     def make_all_tables(self) -> Dict[Type, Mapper]:
         """
-        Create all the SQLAlchemy tables from the classes in the class_dict.
+        Create all the SQLAlchemy tables from the classes in the class_dict and subclass_dict.
 
         :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
         """
-        return {wrapped_table.clazz: wrapped_table.mapped_table for wrapped_table in self.class_dict.values()
-                if wrapped_table.clazz not in self.explicitly_mapped_classes.keys()}
+        result = {}
+
+        # Add tables from class_dict
+        for wrapped_table in self.class_dict.values():
+            if wrapped_table.clazz not in self.explicitly_mapped_classes.keys():
+                result[wrapped_table.clazz] = wrapped_table.mapped_table
+
+        # Add tables from subclass_dict
+        for wrapped_table in self.subclass_dict.values():
+            if wrapped_table.clazz not in self.explicitly_mapped_classes.keys():
+                result[wrapped_table.clazz] = wrapped_table.mapped_table
+
+        return result
 
     def parse_classes(self):
         """
-        Parse all the classes in the class_dict, aggregating the columns, primary keys, foreign keys and relationships.
+        Parse all the classes in the class_dict and subclass_dict, aggregating the columns, primary keys, foreign keys and relationships.
         """
+        # Parse classes in the original class_dict
         for wrapped_table in self.class_dict.values():
+            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
+                continue
+            self.parse_class(wrapped_table)
+
+        # Parse classes in the subclass_dict
+        for wrapped_table in self.subclass_dict.values():
             if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
                 continue
             self.parse_class(wrapped_table)
@@ -136,6 +168,11 @@ class ORMatic:
 
         :param wrapped_table: The WrappedTable object to parse
         """
+        # Skip parsing fields for classes that were not in the original list
+        if wrapped_table.clazz not in self.original_classes and wrapped_table.clazz not in self.explicitly_mapped_classes.keys():
+            logger.info(f"Skipping fields for {wrapped_table.clazz.__name__} as it was not in the original class list")
+            return
+
         for f in fields(wrapped_table.clazz):
             if wrapped_table.parent_class and f in fields(wrapped_table.parent_class.clazz):
                 continue
@@ -178,6 +215,7 @@ class ORMatic:
             self.create_custom_type_column(wrapped_table, field_info)
         elif not field_info.container and (
                 field_info.type in self.class_dict
+                or field_info.type in self.subclass_dict
                 or field_info.type in self.type_mappings.keys()
         ):
             logger.info(f"Parsing as one to one relationship.")
@@ -207,10 +245,8 @@ class ORMatic:
 
         fk_name = f"{field_info.name}{self.foreign_key_postfix}"
 
-        # other_wrapped_table = self.explicitly_mapped_classes.get(field_info.type)
-        # if other_wrapped_table is None:
-        #     other_wrapped_table = self.class_dict[field_info.type]
-        other_wrapped_table = self.class_dict[field_info.type]
+        # Get the wrapped table from either class_dict or subclass_dict
+        other_wrapped_table = self.class_dict.get(field_info.type) or self.subclass_dict.get(field_info.type)
 
         # create a foreign key to field.type
         column = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name),
@@ -247,7 +283,7 @@ class ORMatic:
         :param field_info: The field to parse
         """
 
-        if field_info.type in self.class_dict:
+        if field_info.type in self.class_dict or field_info.type in self.subclass_dict:
             self.create_one_to_many_relationship(wrapped_table, field_info)
 
         elif field_info.is_container_of_builtin:
@@ -266,7 +302,8 @@ class ORMatic:
         :param wrapped_table: The "one" side of the relationship.
         :param field_info: The "many" side of the relationship.
         """
-        child_wrapped_table = self.class_dict[field_info.type]
+        # Get the wrapped table from either class_dict or subclass_dict
+        child_wrapped_table = self.class_dict.get(field_info.type) or self.subclass_dict.get(field_info.type)
 
         # Check if the field type is a parent class of the current class
         is_parent_class = issubclass(wrapped_table.clazz, field_info.type)
@@ -307,6 +344,10 @@ class ORMatic:
         generator.module_imports |= {clazz.explicit_mapping.__module__ for clazz in self.class_dict.keys() if
                                      issubclass(clazz, ORMaticExplicitMapping)}
         generator.module_imports |= {clazz.__module__ for clazz in self.class_dict.keys()}
+        # Add imports for subclasses
+        generator.module_imports |= {clazz.explicit_mapping.__module__ for clazz in self.subclass_dict.keys() if
+                                     issubclass(clazz, ORMaticExplicitMapping)}
+        generator.module_imports |= {clazz.__module__ for clazz in self.subclass_dict.keys()}
         generator.imports["sqlalchemy.orm"] = {"registry", "relationship", "RelationshipProperty"}
 
         # write tables
@@ -316,8 +357,24 @@ class ORMatic:
         file.write("\n")
         file.write("mapper_registry = registry(metadata=metadata)\n")
 
-        # write imperative mapping calls
+        # write imperative mapping calls for original classes
         for wrapped_table in self.class_dict.values():
+            if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
+                continue
+            file.write("\n")
+
+            parsed_kwargs = wrapped_table.mapper_kwargs_for_python_file(self)
+            if issubclass(wrapped_table.clazz, ORMaticExplicitMapping):
+                key = wrapped_table.clazz.explicit_mapping
+            else:
+                key = wrapped_table.clazz
+
+            file.write(f"m_{wrapped_table.tablename} = mapper_registry."
+                       f"map_imperatively({key.__module__}.{key.__name__}, "
+                       f"t_{wrapped_table.tablename}, {parsed_kwargs})\n")
+
+        # write imperative mapping calls for subclasses
+        for wrapped_table in self.subclass_dict.values():
             if wrapped_table.clazz in self.explicitly_mapped_classes.keys():
                 continue
             file.write("\n")
@@ -393,6 +450,11 @@ class WrappedTable:
     The parent class of self.clazz if it exists.
     """
 
+    ormatic: Any = None
+    """
+    Reference to the ORMatic instance that created this WrappedTable.
+    """
+
     @cached_property
     def primary_key(self):
         if self.parent_class:
@@ -422,6 +484,10 @@ class WrappedTable:
 
     @property
     def is_root_of_non_empty_inheritance_structure(self):
+        # Only consider subclasses that are in the original list of classes
+        if self.ormatic and self.subclasses:
+            original_subclasses = [s for s in self.subclasses if s.clazz in self.ormatic.original_classes]
+            return len(original_subclasses) > 0 and not self.parent_class
         return self.has_subclasses and not self.parent_class
 
     @property
@@ -477,10 +543,13 @@ class WrappedTable:
                 f"foreign_keys=[{foreign_key_constraint}])")
 
         for relationship_info in self.one_to_many_relationships:
-            foreign_key_constraint = f"t_{ormatic.class_dict[relationship_info.relationship.argument].tablename}.c.{relationship_info.foreign_key_name}"
-            properties[relationship_info.field_info.name] = (
-                f"relationship('{relationship_info.field_info.type.__name__}',"
-                f"foreign_keys=[{foreign_key_constraint}])")
+            # Get the wrapped table from either class_dict or subclass_dict
+            related_wrapped_table = ormatic.class_dict.get(relationship_info.relationship.argument) or ormatic.subclass_dict.get(relationship_info.relationship.argument)
+            if related_wrapped_table:
+                foreign_key_constraint = f"t_{related_wrapped_table.tablename}.c.{relationship_info.foreign_key_name}"
+                properties[relationship_info.field_info.name] = (
+                    f"relationship('{relationship_info.field_info.type.__name__}',"
+                    f"foreign_keys=[{foreign_key_constraint}])")
 
         for custom_type_info in self.custom_types:
             properties[custom_type_info.field_info.name] = f"t_{self.tablename}.c.{custom_type_info.field_info.name}"

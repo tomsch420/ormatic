@@ -232,4 +232,3 @@ class ChildMapped(Parent):
 @dataclass
 class ChildNotMapped(Parent):
     attribute2: int
-
