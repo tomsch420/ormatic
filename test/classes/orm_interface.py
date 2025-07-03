@@ -10,6 +10,7 @@ import classes.example_classes
 class Base(DeclarativeBase):
     pass
 
+
 class AtomDAO(Base, DataAccessObject[Atom]):
     __tablename__ = 'AtomDAO'
 
