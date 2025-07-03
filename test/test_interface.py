@@ -73,8 +73,19 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(o1, o1_reconstructed)
 
     def test_pose(self):
-        # Skip this test for now due to issues with relationship handling
-        pass
+        p1 = Position(1, 2, 3)
+        o1 = Orientation(1.0, 2.0, 3.0, None)
+        pose = Pose(p1, o1)
+        posedao = PoseDAO.to_dao(pose)
+        self.assertIsInstance(posedao.position, PositionDAO)
+        self.assertIsInstance(posedao.orientation, OrientationDAO)
+
+        self.session.add(posedao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(PoseDAO)).one()
+        queried = queried.from_dao()
+        self.assertEqual(pose, queried)
 
     def test_atom(self):
         # Skip this test for now due to issues with Enum handling
@@ -88,9 +99,6 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(p4d.y, p4d_dao.y)
         self.assertEqual(p4d.z, p4d_dao.z)
         self.assertEqual(p4d.w, p4d_dao.w)
-
-        # Debug: Print the polymorphic_type
-        print(f"p4d_dao.polymorphic_type = {p4d_dao.polymorphic_type}")
 
         self.session.add(p4d_dao)
         self.session.commit()
