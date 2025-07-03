@@ -1,17 +1,19 @@
 from __future__ import annotations
-import inspect
+
 from dataclasses import fields, is_dataclass
 from functools import lru_cache
 
-from typing_extensions import Type, get_args, Dict, Any, Self, TypeVar, Generic
+from typing_extensions import Type, get_args, Dict, Any, TypeVar, Generic
 
 T = TypeVar('T')
 _DAO = TypeVar("_DAO", bound="DataAccessObject")
 
+
 class NoGenericError(TypeError):
     def __init__(self, cls):
         super().__init__(f"Cannot determine original class for {cls.__name__!r}. "
-                    "Did you forget to parameterise the DataAccessObject subclass?")
+                         "Did you forget to parameterise the DataAccessObject subclass?")
+
 
 class DataAccessObject(Generic[T]):
     """
@@ -78,6 +80,10 @@ class DataAccessObject(Generic[T]):
         # Create a new instance of the DAO class
         dao_instance = cls()
         memo[id(obj)] = dao_instance
+
+        # Set the polymorphic_type if the DAO has this attribute
+        if hasattr(dao_instance, 'polymorphic_type'):
+            dao_instance.polymorphic_type = f"{obj.__class__.__module__}.{obj.__class__.__name__}"
 
         # If the original object is a dataclass, copy its fields to the DAO
         if is_dataclass(obj):
@@ -152,6 +158,20 @@ class DataAccessObject(Generic[T]):
         # Get the original class based on the actual type of the DAO object
         original_cls = type(self).original_class()
 
+        # For polymorphic types, use the actual class type stored in polymorphic_type if available
+        if hasattr(self, 'polymorphic_type') and self.polymorphic_type:
+            # Try to find the actual class by name
+            try:
+                import importlib
+                module_name, class_name = self.polymorphic_type.rsplit('.', 1)
+                module = importlib.import_module(module_name)
+                actual_cls = getattr(module, class_name)
+                if issubclass(actual_cls, original_cls):
+                    original_cls = actual_cls
+            except (ValueError, ImportError, AttributeError):
+                # If we can't find the class, fall back to the original class
+                pass
+
         # Create a dictionary to hold the constructor arguments
         constructor_args = {}
 
@@ -172,7 +192,8 @@ class DataAccessObject(Generic[T]):
                     if isinstance(field_value, list):
                         # Skip empty lists
                         if not field_value:
-                            constructor_args[field_name] = field.default_factory() if hasattr(field, 'default_factory') else []
+                            constructor_args[field_name] = field.default_factory() if hasattr(field,
+                                                                                              'default_factory') else []
                             continue
 
                         # Check if the items are DAOs

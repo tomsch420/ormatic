@@ -335,10 +335,11 @@ class WrappedTable:
         kwargs = {"properties": self.properties_kwargs}
 
         if self.is_root_of_non_empty_inheritance_structure:
-            kwargs["polymorphic_on"] = self.polymorphic_on_name
-            kwargs["polymorphic_identity"] = self.tablename
+            # Use the polymorphic_type column as the discriminator
+            kwargs["polymorphic_on"] = "polymorphic_type"
+            kwargs["polymorphic_identity"] = f"{self.clazz.__module__}.{self.clazz.__name__}"
         elif self.parent_class:
-            kwargs["polymorphic_identity"] = self.tablename
+            kwargs["polymorphic_identity"] = f"{self.clazz.__module__}.{self.clazz.__name__}"
             kwargs["inherits"] = self.parent_class.mapped_table
 
         return kwargs
