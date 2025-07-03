@@ -24,6 +24,19 @@ def render_class_declaration_dao(self, model) -> str:
     else:
         return f"class {model.name}({parent_class_name}, DataAccessObject[{model.name[:-3]}]):"
 
+def render_enum_aware_column_type(self, coltype) -> str:
+    """
+    Render a column type, handling Enum types as imported enums.
+    This is a drop in replacement for the TablesGenerator.render_column_type method.
+
+    :param self: The TablesGenerator instance
+    :param coltype: The column type to render
+    :return: The rendered column type
+    """
+    if not isinstance(coltype, sqlalchemy.Enum):
+        return self.render_column_type_old(coltype)
+    return f"Enum({coltype.python_type.__module__}.{coltype.python_type.__name__})"
+
 
 class PythonFileGenerator:
     """
@@ -46,10 +59,14 @@ class PythonFileGenerator:
         """
 
         generator.render_class_declaration_old = generator.render_class_declaration
-
         generator.render_class_declaration = types.MethodType(
             render_class_declaration_dao,  # function to bind
             generator  # bind it to this instance
+        )
+
+        generator.render_column_type_old = generator.render_column_type
+        generator.render_column_type = types.MethodType(
+            render_enum_aware_column_type, generator
         )
 
     def to_python_file(self, generator: sqlacodegen.generators.DataclassGenerator, file: TextIO):
@@ -69,5 +86,7 @@ class PythonFileGenerator:
 
         generator.imports["ormatic.dao"] = {DataAccessObject.__name__}
 
+        # Generate the code
+        code = generator.generate()
         # write tables
-        file.write(generator.generate())
+        file.write(code)

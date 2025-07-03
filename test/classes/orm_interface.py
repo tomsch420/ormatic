@@ -15,7 +15,7 @@ class AtomDAO(Base, DataAccessObject[Atom]):
     __tablename__ = 'AtomDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    element: Mapped[classes.example_classes.Element] = mapped_column(Enum('C', 'H', name='element'))
+    element: Mapped[classes.example_classes.Element] = mapped_column(Enum(classes.example_classes.Element))
     type: Mapped[int] = mapped_column(Integer)
     charge: Mapped[float] = mapped_column(Float)
 
@@ -112,9 +112,9 @@ class PositionDAO(Base, DataAccessObject[Position]):
     x: Mapped[float] = mapped_column(Float)
     y: Mapped[float] = mapped_column(Float)
     z: Mapped[float] = mapped_column(Float)
-    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     doublepositionaggregator_positions1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
     doublepositionaggregator_positions2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
+    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
     doublepositionaggregator_positions1: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions1_id], back_populates='PositionDAO')
