@@ -91,14 +91,14 @@ class PositionsDAO(Base, DataAccessObject[Positions]):
     PositionDAO: Mapped[List['PositionDAO']] = relationship('PositionDAO', back_populates='positions_positions')
 
 
-class ChildMappedDAO(ParentDAO, DataAccessObject[ChildMapped]):
+class ChildMappedDAO(ParentDAO):
     __tablename__ = 'ChildMappedDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey('ParentDAO.id'), primary_key=True)
     attribute1: Mapped[int] = mapped_column(Integer)
 
 
-class DerivedEntityDAO(EntityDAO, DataAccessObject[DerivedEntity]):
+class DerivedEntityDAO(EntityDAO):
     __tablename__ = 'DerivedEntityDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey('EntityDAO.id'), primary_key=True)
@@ -112,9 +112,9 @@ class PositionDAO(Base, DataAccessObject[Position]):
     x: Mapped[float] = mapped_column(Float)
     y: Mapped[float] = mapped_column(Float)
     z: Mapped[float] = mapped_column(Float)
+    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     doublepositionaggregator_positions1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
     doublepositionaggregator_positions2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
-    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
     doublepositionaggregator_positions1: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions1_id], back_populates='PositionDAO')
@@ -123,7 +123,7 @@ class PositionDAO(Base, DataAccessObject[Position]):
     PoseDAO: Mapped[List['PoseDAO']] = relationship('PoseDAO', back_populates='position')
 
 
-class TorsoDAO(KinematicChainDAO, DataAccessObject[Torso]):
+class TorsoDAO(KinematicChainDAO):
     __tablename__ = 'TorsoDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey('KinematicChainDAO.id'), primary_key=True)
@@ -141,7 +141,7 @@ class PoseDAO(Base, DataAccessObject[Pose]):
     OriginalSimulatedObjectDAO: Mapped[List['OriginalSimulatedObjectDAO']] = relationship('OriginalSimulatedObjectDAO', back_populates='pose')
 
 
-class Position4DDAO(PositionDAO, DataAccessObject[Position4D]):
+class Position4DDAO(PositionDAO):
     __tablename__ = 'Position4DDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), primary_key=True)

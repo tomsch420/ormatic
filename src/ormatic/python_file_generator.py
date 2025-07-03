@@ -18,7 +18,11 @@ def render_class_declaration_dao(self, model) -> str:
         model.parent_class.name if model.parent_class else self.base_class_name
     )
     # add the DAO mixin and exclude the DAO suffix for the template.
-    return f"class {model.name}({parent_class_name}, DataAccessObject[{model.name[:-3]}]):"
+    # Only add DataAccessObject if the parent class is not already a DAO class
+    if parent_class_name.endswith("DAO"):
+        return f"class {model.name}({parent_class_name}):"
+    else:
+        return f"class {model.name}({parent_class_name}, DataAccessObject[{model.name[:-3]}]):"
 
 
 class PythonFileGenerator:

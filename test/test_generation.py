@@ -55,7 +55,6 @@ class ORMaticTestCase(unittest.TestCase):
         clear_mappers()
         cls.session.close()
 
-
     def test_no_dependencies(self):
         position_table = self.ormatic_instance.class_dict[Position].mapped_table
         orientation_table = self.ormatic_instance.class_dict[Orientation].mapped_table
