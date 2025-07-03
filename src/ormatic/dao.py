@@ -1,15 +1,10 @@
-from typing import Type, get_args, Dict, List, TextIO, Any
 import inspect
-import os
-import types
-from dataclasses import dataclass, fields, is_dataclass
-from importlib import import_module
-
-from sqlalchemy import Column, Table, Integer, String
-from sqlalchemy.orm import MappedAsDataclass, registry, declared_attr, DeclarativeBase
-from typing_extensions import TypeVar, Generic, Self, Optional, get_type_hints
+from dataclasses import fields, is_dataclass
+from typing_extensions import Type, get_args, Dict, Any, Self, TypeVar, Generic
 
 T = TypeVar('T')
+_DAO = TypeVar("_DAO", bound="DataAccessObject")
+
 
 
 class DataAccessObject(Generic[T]):
@@ -44,7 +39,7 @@ class DataAccessObject(Generic[T]):
             )
 
     @classmethod
-    def from_original_class(cls, original_instance: T, memo: Dict[int, Any] = None) -> Self:
+    def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
         """
         Create an instance of this class from an instance of the original class.
         If a different specification than the specification of the original class is needed, overload this method.
@@ -54,31 +49,10 @@ class DataAccessObject(Generic[T]):
 
         if memo is None:
             memo = {}
-        if id(original_instance) in memo:
-            return memo[id(original_instance)]
+        if id(obj) in memo:
+            return memo[id(obj)]
 
-        if not is_dataclass(original_instance.__class__):
-            raise TypeError(f"Original class {original_instance.__class__.__name__} must be a dataclass")
-
-        # Get constructor parameters
-        init_params = inspect.signature(cls.__init__).parameters
-        init_param_names = set(init_params.keys()) - {'self'}
-
-        # Get field values from original instance
-        field_values = {}
-        for f in fields(original_instance.__class__):
-            # Only include fields that are accepted by the constructor
-            if f.name in init_param_names or f.name not in init_param_names and hasattr(cls, f.name):
-                field_values[f.name] = getattr(original_instance, f.name)
-
-        # Add id field with default value if not present and accepted by constructor
-        if 'id' not in field_values and 'id' in init_param_names:
-            field_values['id'] = None
-
-        # Create new instance with field values
-        return cls(**field_values)
-
-    def to_original_class(self, memo: Dict[int, Any] = None) -> T:
+    def from_dao(self, memo: Dict[int, Any] = None) -> T:
         """
         :return: An instance of this class created from the original class.
         """
@@ -88,21 +62,6 @@ class DataAccessObject(Generic[T]):
         if id(self) in memo:
             return memo[id(self)]
 
-        original_cls = self.original_class()
-
-        # Get constructor parameters
-        init_params = inspect.signature(original_cls.__init__).parameters
-        init_param_names = set(init_params.keys()) - {'self'}
-
-        # Get field values from this instance
-        field_values = {}
-        for f in fields(original_cls):
-            # Only include fields that are accepted by the constructor
-            if f.name in init_param_names and hasattr(self, f.name):
-                field_values[f.name] = getattr(self, f.name)
-
-        # Create new instance with field values
-        return original_cls(**field_values)
 
 # inheritance
 # foreign keys
