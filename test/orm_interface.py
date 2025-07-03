@@ -1,243 +1,247 @@
-from classes.example_classes import PhysicalObjectType
+from classes.example_classes import Atom, Bond, ChildMapped, DerivedEntity, DoublePositionAggregator, EntityDAO, EnumContainer, KinematicChain, Molecule, MultipleInheritance, Node, OGSimObjSubclass, ObjectAnnotation, Orientation, Parent, Parent1, Parent2, PartialPosition, PhysicalObjectType, Pose, Position, Position5D, PositionTypeWrapper, Positions, SimulatedObject, Torso
 from ormatic.custom_types import TypeType
+from ormatic.dao import DataAccessObject
+from typing import Any, List, Optional
 
-from sqlalchemy import Boolean, Column, Enum, Float, ForeignKey, Integer, JSON, MetaData, String, Table
-from sqlalchemy.orm import RelationshipProperty, registry, relationship
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, JSON, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 import classes.example_classes
 
-metadata = MetaData()
+class Base(MappedAsDataclass, DeclarativeBase):
+    pass
 
 
-t_DerivedEntity = Table(
-    'DerivedEntity', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('name', String(255), nullable=False)
-)
+class DerivedEntityDAO(Base, DataAccessObject[DerivedEntity]):
+    __tablename__ = 'DerivedEntityDAO'
 
-t_DoublePositionAggregator = Table(
-    'DoublePositionAggregator', metadata,
-    Column('id', Integer, primary_key=True)
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(String(255))
 
-t_Entity = Table(
-    'Entity', metadata,
-    Column('id', Integer, primary_key=True)
-)
 
-t_EnumContainer = Table(
-    'EnumContainer', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('value', Enum(classes.example_classes.ValueEnum), nullable=False)
-)
+class DoublePositionAggregatorDAO(Base, DataAccessObject[DoublePositionAggregator]):
+    __tablename__ = 'DoublePositionAggregatorDAO'
 
-t_KinematicChain = Table(
-    'KinematicChain', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('name', String(255), nullable=False),
-    Column('polymorphic_type', String(255))
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-t_Molecule = Table(
-    'Molecule', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('ind1', Integer, nullable=False),
-    Column('inda', Integer, nullable=False),
-    Column('logp', Float, nullable=False),
-    Column('lumo', Float, nullable=False),
-    Column('mutagenic', Boolean, nullable=False)
-)
+    PositionDAO: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions1_id]', back_populates='doublepositionaggregator_positions1')
+    PositionDAO_: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions2_id]', back_populates='doublepositionaggregator_positions2')
 
-t_Node = Table(
-    'Node', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('parent_id', ForeignKey('Node.id'))
-)
 
-t_Orientation = Table(
-    'Orientation', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('x', Float, nullable=False),
-    Column('y', Float, nullable=False),
-    Column('z', Float, nullable=False),
-    Column('w', Float)
-)
+class EntityDAODAO(Base, DataAccessObject[EntityDAO]):
+    __tablename__ = 'EntityDAODAO'
 
-t_OriginalSimulatedObject = Table(
-    'OriginalSimulatedObject', metadata,
-    Column('id', Integer, primary_key=True)
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
 
-t_Parent = Table(
-    'Parent', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('name', String(255), nullable=False),
-    Column('polymorphic_type', String(255))
-)
 
-t_Parent1 = Table(
-    'Parent1', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('obj', String(255), nullable=False),
-    Column('polymorphic_type', String(255))
-)
+class EnumContainerDAO(Base, DataAccessObject[EnumContainer]):
+    __tablename__ = 'EnumContainerDAO'
 
-t_Parent2 = Table(
-    'Parent2', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('obj2', String(255), nullable=False)
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    value: Mapped[classes.example_classes.ValueEnum] = mapped_column(Enum('A', 'B', 'C', name='valueenum'))
 
-t_PositionTypeWrapper = Table(
-    'PositionTypeWrapper', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('position_type', TypeType)
-)
 
-t_Positions = Table(
-    'Positions', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('some_strings', JSON)
-)
+class KinematicChainDAO(Base, DataAccessObject[KinematicChain]):
+    __tablename__ = 'KinematicChainDAO'
 
-t_Atom = Table(
-    'Atom', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('element', Enum(classes.example_classes.Element), nullable=False),
-    Column('type', Integer, nullable=False),
-    Column('charge', Float, nullable=False),
-    Column('molecule_atoms_id', ForeignKey('Molecule.id'))
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
-t_ChildMapped = Table(
-    'ChildMapped', metadata,
-    Column('id', ForeignKey('Parent.id'), primary_key=True),
-    Column('attribute1', Integer, nullable=False)
-)
 
-t_ChildNotMapped = Table(
-    'ChildNotMapped', metadata,
-    Column('id', ForeignKey('Parent.id'), primary_key=True)
-)
+class MoleculeDAO(Base, DataAccessObject[Molecule]):
+    __tablename__ = 'MoleculeDAO'
 
-t_MultipleInheritance = Table(
-    'MultipleInheritance', metadata,
-    Column('id', ForeignKey('Parent1.id'), primary_key=True),
-    Column('obj2', String(255), nullable=False)
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ind1: Mapped[int] = mapped_column(Integer)
+    inda: Mapped[int] = mapped_column(Integer)
+    logp: Mapped[float] = mapped_column(Float)
+    lumo: Mapped[float] = mapped_column(Float)
+    mutagenic: Mapped[bool] = mapped_column(Boolean)
 
-t_ObjectAnnotation = Table(
-    'ObjectAnnotation', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('object_reference_id', ForeignKey('OriginalSimulatedObject.id'), nullable=False)
-)
+    AtomDAO: Mapped[List['AtomDAO']] = relationship('AtomDAO', back_populates='molecule_atoms')
+    BondDAO: Mapped[List['BondDAO']] = relationship('BondDAO', back_populates='molecule_bonds')
 
-t_Position = Table(
-    'Position', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('doublepositionaggregator_positions1_id', ForeignKey('DoublePositionAggregator.id')),
-    Column('doublepositionaggregator_positions2_id', ForeignKey('DoublePositionAggregator.id')),
-    Column('x', Float, nullable=False),
-    Column('y', Float, nullable=False),
-    Column('z', Float, nullable=False),
-    Column('positions_positions_id', ForeignKey('Positions.id')),
-    Column('polymorphic_type', String(255))
-)
 
-t_Torso = Table(
-    'Torso', metadata,
-    Column('id', ForeignKey('KinematicChain.id'), primary_key=True)
-)
+class NodeDAO(Base, DataAccessObject[Node]):
+    __tablename__ = 'NodeDAO'
 
-t_Bond = Table(
-    'Bond', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('atom1_id', ForeignKey('Atom.id'), nullable=False),
-    Column('atom2_id', ForeignKey('Atom.id'), nullable=False),
-    Column('type', Integer, nullable=False),
-    Column('molecule_bonds_id', ForeignKey('Molecule.id'))
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'))
 
-t_Pose = Table(
-    'Pose', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('position_id', ForeignKey('Position.id'), nullable=False),
-    Column('orientation_id', ForeignKey('Orientation.id'), nullable=False)
-)
+    parent: Mapped[Optional['NodeDAO']] = relationship('NodeDAO', remote_side=[id], back_populates='parent_reverse')
+    parent_reverse: Mapped[List['NodeDAO']] = relationship('NodeDAO', remote_side=[parent_id], back_populates='parent')
 
-t_Position4D = Table(
-    'Position4D', metadata,
-    Column('id', ForeignKey('Position.id'), primary_key=True)
-)
 
-t_Position5D = Table(
-    'Position5D', metadata,
-    Column('id', ForeignKey('Position.id'), primary_key=True),
-    Column('a', Float, nullable=False)
-)
+class ObjectAnnotationDAO(Base, DataAccessObject[ObjectAnnotation]):
+    __tablename__ = 'ObjectAnnotationDAO'
 
-t_OGSimObjSubclass = Table(
-    'OGSimObjSubclass', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('concept', PhysicalObjectType, nullable=False),
-    Column('pose_id', ForeignKey('Pose.id'), nullable=False)
-)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-mapper_registry = registry(metadata=metadata)
 
-m_Entity = mapper_registry.map_imperatively(classes.example_classes.Entity, t_Entity, )
+class OrientationDAO(Base, DataAccessObject[Orientation]):
+    __tablename__ = 'OrientationDAO'
 
-m_OGSimObjSubclass = mapper_registry.map_imperatively(classes.example_classes.OGSimObjSubclass, t_OGSimObjSubclass, properties = dict(pose=relationship('Pose',foreign_keys=[t_OGSimObjSubclass.c.pose_id]), 
-concept=t_OGSimObjSubclass.c.concept))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    z: Mapped[float] = mapped_column(Float)
+    w: Mapped[Optional[float]] = mapped_column(Float)
 
-m_Atom = mapper_registry.map_imperatively(classes.example_classes.Atom, t_Atom, )
+    PoseDAO: Mapped[List['PoseDAO']] = relationship('PoseDAO', back_populates='orientation')
 
-m_DoublePositionAggregator = mapper_registry.map_imperatively(classes.example_classes.DoublePositionAggregator, t_DoublePositionAggregator, properties = dict(positions1=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions1_id]), 
-positions2=relationship('Position',foreign_keys=[t_Position.c.doublepositionaggregator_positions2_id])))
 
-m_Position = mapper_registry.map_imperatively(classes.example_classes.Position, t_Position, polymorphic_on = "polymorphic_type", polymorphic_identity = "Position")
+class Parent1DAO(Base, DataAccessObject[Parent1]):
+    __tablename__ = 'Parent1DAO'
 
-m_Positions = mapper_registry.map_imperatively(classes.example_classes.Positions, t_Positions, properties = dict(positions=relationship('Position',foreign_keys=[t_Position.c.positions_positions_id])))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    obj: Mapped[str] = mapped_column(String(255))
+    polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
-m_KinematicChain = mapper_registry.map_imperatively(classes.example_classes.KinematicChain, t_KinematicChain, polymorphic_on = "polymorphic_type", polymorphic_identity = "KinematicChain")
 
-m_Bond = mapper_registry.map_imperatively(classes.example_classes.Bond, t_Bond, properties = dict(atom1=relationship('Atom',foreign_keys=[t_Bond.c.atom1_id]), 
-atom2=relationship('Atom',foreign_keys=[t_Bond.c.atom2_id])))
+class Parent2DAO(Base, DataAccessObject[Parent2]):
+    __tablename__ = 'Parent2DAO'
 
-m_ObjectAnnotation = mapper_registry.map_imperatively(classes.example_classes.ObjectAnnotation, t_ObjectAnnotation, properties = dict(object_reference=relationship('OriginalSimulatedObject',foreign_keys=[t_ObjectAnnotation.c.object_reference_id])))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    obj2: Mapped[str] = mapped_column(String(255))
 
-m_Parent = mapper_registry.map_imperatively(classes.example_classes.Parent, t_Parent, polymorphic_on = "polymorphic_type", polymorphic_identity = "Parent")
 
-m_Parent2 = mapper_registry.map_imperatively(classes.example_classes.Parent2, t_Parent2, )
+class ParentDAO(Base, DataAccessObject[Parent]):
+    __tablename__ = 'ParentDAO'
 
-m_Molecule = mapper_registry.map_imperatively(classes.example_classes.Molecule, t_Molecule, properties = dict(atoms=relationship('Atom',foreign_keys=[t_Atom.c.molecule_atoms_id]), 
-bonds=relationship('Bond',foreign_keys=[t_Bond.c.molecule_bonds_id])))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
-m_PositionTypeWrapper = mapper_registry.map_imperatively(classes.example_classes.PositionTypeWrapper, t_PositionTypeWrapper, properties = dict(position_type=t_PositionTypeWrapper.c.position_type))
 
-m_Position4D = mapper_registry.map_imperatively(classes.example_classes.Position4D, t_Position4D, )
+class PartialPositionDAO(Base, DataAccessObject[PartialPosition]):
+    __tablename__ = 'PartialPositionDAO'
 
-m_Node = mapper_registry.map_imperatively(classes.example_classes.Node, t_Node, properties = dict(parent=relationship('Node',foreign_keys=[t_Node.c.parent_id])))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    z: Mapped[float] = mapped_column(Float)
 
-m_EnumContainer = mapper_registry.map_imperatively(classes.example_classes.EnumContainer, t_EnumContainer, )
 
-m_Parent1 = mapper_registry.map_imperatively(classes.example_classes.Parent1, t_Parent1, polymorphic_on = "polymorphic_type", polymorphic_identity = "Parent1")
+class PositionTypeWrapperDAO(Base, DataAccessObject[PositionTypeWrapper]):
+    __tablename__ = 'PositionTypeWrapperDAO'
 
-m_Pose = mapper_registry.map_imperatively(classes.example_classes.Pose, t_Pose, properties = dict(position=relationship('Position',foreign_keys=[t_Pose.c.position_id]), 
-orientation=relationship('Orientation',foreign_keys=[t_Pose.c.orientation_id])))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position_type: Mapped[Optional[Any]] = mapped_column(TypeType)
 
-m_Orientation = mapper_registry.map_imperatively(classes.example_classes.Orientation, t_Orientation, )
 
-m_OriginalSimulatedObject = mapper_registry.map_imperatively(classes.example_classes.OriginalSimulatedObject, t_OriginalSimulatedObject, properties = dict(pose=relationship('Pose',foreign_keys=[t_OriginalSimulatedObject.c.pose_id]), 
-concept=t_OriginalSimulatedObject.c.concept))
+class PositionsDAO(Base, DataAccessObject[Positions]):
+    __tablename__ = 'PositionsDAO'
 
-m_DerivedEntity = mapper_registry.map_imperatively(classes.example_classes.DerivedEntity, t_DerivedEntity, )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    some_strings: Mapped[Optional[dict]] = mapped_column(JSON)
 
-m_Position5D = mapper_registry.map_imperatively(classes.example_classes.Position5D, t_Position5D, polymorphic_identity = "Position5D", inherits = m_Position)
+    PositionDAO: Mapped[List['PositionDAO']] = relationship('PositionDAO', back_populates='positions_positions')
 
-m_Torso = mapper_registry.map_imperatively(classes.example_classes.Torso, t_Torso, properties = dict(kinematic_chains=relationship('KinematicChain',foreign_keys=[t_KinematicChain.c.torso_kinematic_chains_id])), polymorphic_identity = "Torso", inherits = m_KinematicChain)
 
-m_ChildMapped = mapper_registry.map_imperatively(classes.example_classes.ChildMapped, t_ChildMapped, polymorphic_identity = "ChildMapped", inherits = m_Parent)
+class AtomDAO(Base, DataAccessObject[Atom]):
+    __tablename__ = 'AtomDAO'
 
-m_MultipleInheritance = mapper_registry.map_imperatively(classes.example_classes.MultipleInheritance, t_MultipleInheritance, polymorphic_identity = "MultipleInheritance", inherits = m_Parent1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    element: Mapped[classes.example_classes.Element] = mapped_column(Enum('C', 'H', 'O', 'N', 'F', 'B', 'I', name='element'))
+    type: Mapped[int] = mapped_column(Integer)
+    charge: Mapped[float] = mapped_column(Float)
+    molecule_atoms_id: Mapped[Optional[int]] = mapped_column(ForeignKey('MoleculeDAO.id'))
 
-m_ChildNotMapped = mapper_registry.map_imperatively(classes.example_classes.ChildNotMapped, t_ChildNotMapped, polymorphic_identity = "ChildNotMapped", inherits = m_Parent)
+    molecule_atoms: Mapped[Optional['MoleculeDAO']] = relationship('MoleculeDAO', back_populates='AtomDAO')
+    BondDAO: Mapped[List['BondDAO']] = relationship('BondDAO', foreign_keys='[BondDAO.atom1_id]', back_populates='atom1')
+    BondDAO_: Mapped[List['BondDAO']] = relationship('BondDAO', foreign_keys='[BondDAO.atom2_id]', back_populates='atom2')
+
+
+class ChildMappedDAO(ParentDAO, DataAccessObject[ChildMapped]):
+    __tablename__ = 'ChildMappedDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey('ParentDAO.id'), primary_key=True)
+    attribute1: Mapped[int] = mapped_column(Integer)
+
+
+class MultipleInheritanceDAO(Parent1DAO, DataAccessObject[MultipleInheritance]):
+    __tablename__ = 'MultipleInheritanceDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey('Parent1DAO.id'), primary_key=True)
+    obj2: Mapped[str] = mapped_column(String(255))
+
+
+class PositionDAO(Base, DataAccessObject[Position]):
+    __tablename__ = 'PositionDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    z: Mapped[float] = mapped_column(Float)
+    doublepositionaggregator_positions1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
+    doublepositionaggregator_positions2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
+    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
+    polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
+
+    doublepositionaggregator_positions1: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions1_id], back_populates='PositionDAO')
+    doublepositionaggregator_positions2: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions2_id], back_populates='PositionDAO_')
+    positions_positions: Mapped[Optional['PositionsDAO']] = relationship('PositionsDAO', back_populates='PositionDAO')
+    PoseDAO: Mapped[List['PoseDAO']] = relationship('PoseDAO', back_populates='position')
+
+
+class TorsoDAO(KinematicChainDAO, DataAccessObject[Torso]):
+    __tablename__ = 'TorsoDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey('KinematicChainDAO.id'), primary_key=True)
+
+
+class BondDAO(Base, DataAccessObject[Bond]):
+    __tablename__ = 'BondDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atom1_id: Mapped[int] = mapped_column(ForeignKey('AtomDAO.id'))
+    atom2_id: Mapped[int] = mapped_column(ForeignKey('AtomDAO.id'))
+    type: Mapped[int] = mapped_column(Integer)
+    molecule_bonds_id: Mapped[Optional[int]] = mapped_column(ForeignKey('MoleculeDAO.id'))
+
+    atom1: Mapped['AtomDAO'] = relationship('AtomDAO', foreign_keys=[atom1_id], back_populates='BondDAO')
+    atom2: Mapped['AtomDAO'] = relationship('AtomDAO', foreign_keys=[atom2_id], back_populates='BondDAO_')
+    molecule_bonds: Mapped[Optional['MoleculeDAO']] = relationship('MoleculeDAO', back_populates='BondDAO')
+
+
+class PoseDAO(Base, DataAccessObject[Pose]):
+    __tablename__ = 'PoseDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'))
+    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'))
+
+    orientation: Mapped['OrientationDAO'] = relationship('OrientationDAO', back_populates='PoseDAO')
+    position: Mapped['PositionDAO'] = relationship('PositionDAO', back_populates='PoseDAO')
+    OGSimObjSubclassDAO: Mapped[List['OGSimObjSubclassDAO']] = relationship('OGSimObjSubclassDAO', back_populates='pose')
+    SimulatedObjectDAO: Mapped[List['SimulatedObjectDAO']] = relationship('SimulatedObjectDAO', back_populates='pose')
+
+
+class Position5DDAO(PositionDAO, DataAccessObject[Position5D]):
+    __tablename__ = 'Position5DDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), primary_key=True)
+    a: Mapped[float] = mapped_column(Float)
+
+
+class OGSimObjSubclassDAO(Base, DataAccessObject[OGSimObjSubclass]):
+    __tablename__ = 'OGSimObjSubclassDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    concept: Mapped[Any] = mapped_column(PhysicalObjectType)
+    pose_id: Mapped[int] = mapped_column(ForeignKey('PoseDAO.id'))
+    placeholder: Mapped[float] = mapped_column(Float)
+
+    pose: Mapped['PoseDAO'] = relationship('PoseDAO', back_populates='OGSimObjSubclassDAO')
+
+
+class SimulatedObjectDAO(Base, DataAccessObject[SimulatedObject]):
+    __tablename__ = 'SimulatedObjectDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    concept: Mapped[Any] = mapped_column(PhysicalObjectType)
+    pose_id: Mapped[int] = mapped_column(ForeignKey('PoseDAO.id'))
+
+    pose: Mapped['PoseDAO'] = relationship('PoseDAO', back_populates='SimulatedObjectDAO')

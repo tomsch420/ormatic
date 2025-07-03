@@ -33,6 +33,11 @@ class ORMaticTestCase(unittest.TestCase):
         clear_mappers()
         self.session.close()
 
+    def generate_orm(self, ormatic):
+        generator = sqlacodegen.generators.DataclassGenerator(self.mapper_registry.metadata, self.session.bind, [])
+        with open('orm_interface.py', 'w') as f:
+            ormatic.to_python_file(generator, f)
+
     def test_no_dependencies(self):
         classes = [Position, Orientation]
         result = ORMatic(classes, self.mapper_registry)
@@ -214,7 +219,7 @@ class ORMaticTestCase(unittest.TestCase):
         classes = classes_of_module(example_classes)
 
         ignore_classes = {PhysicalObject, PhysicalObjectType} | set(recursive_subclasses(PhysicalObject))
-        ignore_classes |= {cls.explicit_mapping for cls in recursive_subclasses(ORMaticExplicitMapping)}
+        ignore_classes |= {cls.original_class() for cls in recursive_subclasses(DataAccessObject)}
         ignore_classes |= {OriginalSimulatedObject}
         ignore_classes |= set(recursive_subclasses(Enum))
         ignore_classes |= {ChildNotMapped}  # Exclude ChildNotMapped as it has a Dict field that can't be parsed
@@ -225,10 +230,7 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
 
-        generator = sqlacodegen.generators.TablesGenerator(self.mapper_registry.metadata, self.session.bind, [])
-
-        with open('orm_interface.py', 'w') as f:
-            ormatic.to_python_file(generator, f)
+        self.generate_orm(ormatic)
 
     def test_molecule(self):
         classes = [Atom, Bond, Molecule]
@@ -251,6 +253,7 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic = ORMatic(classes, self.mapper_registry)
         ormatic.make_all_tables()
         self.mapper_registry.metadata.create_all(self.session.bind)
+        self.generate_orm(ormatic)
 
         p1 = Position4D(x=1, y=2, z=0, w=0)
         p2 = Position4D(x=2, y=3, z=0, w=0)
@@ -267,6 +270,7 @@ class ORMaticTestCase(unittest.TestCase):
         ormatic.make_all_tables()
 
         self.mapper_registry.metadata.create_all(self.session.bind)
+        self.generate_orm(ormatic)
 
         obj1 = OriginalSimulatedObject(Bowl(), Pose(Position(0, 0, 0), Orientation(0, 0, 0, 1)), 5)
         self.session.add(obj1)

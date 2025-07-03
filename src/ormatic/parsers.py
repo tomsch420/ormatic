@@ -60,7 +60,6 @@ class FieldParser:
             self.create_custom_type_column(wrapped_table, field_info)
         elif not field_info.container and (
                 field_info.type in self.ormatic.class_dict
-                or field_info.type in self.ormatic.subclass_dict
                 or field_info.type in self.ormatic.type_mappings.keys()
         ):
             logger.info(f"Parsing as one to one relationship.")
@@ -78,7 +77,7 @@ class FieldParser:
         :param wrapped_table: The table that the relationship will be created on
         :param field_info: The field to parse
         """
-        if field_info.type in self.ormatic.class_dict or field_info.type in self.ormatic.subclass_dict:
+        if field_info.type in self.ormatic.class_dict:
             self.create_one_to_many_relationship(wrapped_table, field_info)
 
         elif field_info.is_container_of_builtin:

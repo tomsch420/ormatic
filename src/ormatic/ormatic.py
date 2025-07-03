@@ -69,7 +69,7 @@ class ORMatic:
         self.type_mappings = type_mappings or {}
         self.mapper_registry = mapper_registry
         self.class_dict = {}
-        self.subclass_dict = {}  # Dictionary for subclasses not in the original list
+
         self.explicitly_mapped_classes = {}
         self.original_classes = set(classes)
 
@@ -89,7 +89,7 @@ class ORMatic:
                 logger.warning(f"Class {clazz.__name__} has multiple inheritance. "
                                f"Only the {bases[0].__name__} one will be available for polymorphic selection.")
 
-            base = self.class_dict.get(bases[0]) or self.subclass_dict.get(bases[0]) if bases else None
+            base = self.class_dict.get(bases[0]) if bases else None
 
             # wrap the classes to aggregate the needed properties before compiling it with sql
             wrapped_table = WrappedTable(clazz=clazz, mapper_registry=mapper_registry, parent_class=base, ormatic=self)
@@ -97,8 +97,6 @@ class ORMatic:
             # Add to appropriate dictionary based on whether it's in the original classes
             if clazz in self.original_classes:
                 self.class_dict[clazz] = wrapped_table
-            else:
-                self.subclass_dict[clazz] = wrapped_table
 
             # add the class to the subclasses of the base class
             if base:
@@ -135,7 +133,7 @@ class ORMatic:
 
     def make_all_tables(self) -> Dict[Type, Mapper]:
         """
-        Create all the SQLAlchemy tables from the classes in the class_dict and subclass_dict.
+        Create all the SQLAlchemy tables from the classes in the class_dict
 
         :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
         """
@@ -150,17 +148,11 @@ class ORMatic:
             if wrapped_table.clazz not in explicit_mapping_targets:
                 result[wrapped_table.clazz] = wrapped_table.mapped_table
 
-        # Add tables from subclass_dict
-        for wrapped_table in self.subclass_dict.values():
-            # Skip classes that are targets of explicit mappings
-            if wrapped_table.clazz not in explicit_mapping_targets:
-                result[wrapped_table.clazz] = wrapped_table.mapped_table
-
         return result
 
     def parse_classes(self):
         """
-        Parse all the classes in the class_dict and subclass_dict, aggregating the columns, primary keys, foreign keys and relationships.
+        Parse all the classes in the class_dict, aggregating the columns, primary keys, foreign keys and relationships.
         """
         # Parse classes in the original class_dict
         for wrapped_table in self.class_dict.values():
@@ -196,13 +188,14 @@ class ORMatic:
         """
         return f"{field_info.clazz.__name__.lower()}_{field_info.name}{self.foreign_key_postfix}"
 
-    def to_python_file(self, generator: sqlacodegen.generators.TablesGenerator, file: TextIO):
+    def to_python_file(self, generator: sqlacodegen.generators.DataclassGenerator, file: TextIO):
         """
         Generate a Python file from the ORMatic models.
 
         :param generator: The TablesGenerator instance
         :param file: The file to write to
         """
+        self.python_file_generator = PythonFileGenerator(self)
         self.python_file_generator.to_python_file(generator, file)
 
 
@@ -283,8 +276,10 @@ class WrappedTable:
     @property
     def tablename(self):
         if issubclass(self.clazz, ORMaticExplicitMapping):
-            return self.clazz.explicit_mapping.__name__
-        return self.clazz.__name__
+            result = self.clazz.explicit_mapping.__name__
+        else: result = self.clazz.__name__
+        result += "DAO"
+        return result
 
     @property
     def full_primary_key_name(self):
