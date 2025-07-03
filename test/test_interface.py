@@ -88,8 +88,19 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(pose, queried)
 
     def test_atom(self):
-        # Skip this test for now due to issues with Enum handling
-        pass
+        atom = Atom(Element.C, 1, 2.)
+        atomdao = AtomDAO.to_dao(atom)
+        self.assertEqual(atomdao.element, Element.C)
+
+        self.session.add(atomdao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(AtomDAO)).one()
+        self.assertIsInstance(queried.element, Element)
+
+        atom_from_session = queried.from_dao()
+        self.assertEqual(atom, atom_from_session)
+
 
     def test_position4d(self):
         p4d = Position4D(1.0, 2.0, 3.0, 4.0)

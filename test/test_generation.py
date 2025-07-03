@@ -44,7 +44,7 @@ class ORMaticTestCase(unittest.TestCase):
         cls.ormatic_instance.make_all_tables()
 
         generator = sqlacodegen.generators.DeclarativeGenerator(cls.mapper_registry.metadata, cls.session.bind, [])
-        with open(os.path.join('classes','orm_interface.py'), 'w') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'classes','orm_interface.py'), 'w') as f:
             cls.ormatic_instance.to_python_file(generator, f)
 
         clear_mappers()

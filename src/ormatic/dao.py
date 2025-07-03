@@ -107,10 +107,18 @@ class DataAccessObject(Generic[T]):
                         if is_dataclass(field_value[0]):
                             # Find the appropriate DAO class for the items
                             item_dao_class = None
+                            # First try to find a direct subclass
                             for subclass in cls.__subclasses__():
                                 if subclass.original_class() == type(field_value[0]):
                                     item_dao_class = subclass
                                     break
+
+                            # If not found, search all subclasses of DataAccessObject
+                            if item_dao_class is None:
+                                for subclass in DataAccessObject.__subclasses__():
+                                    if subclass.original_class() == type(field_value[0]):
+                                        item_dao_class = subclass
+                                        break
 
                             if item_dao_class:
                                 # Convert each item to a DAO
@@ -123,10 +131,18 @@ class DataAccessObject(Generic[T]):
                     elif is_dataclass(field_value):
                         # Find the appropriate DAO class for the field
                         field_dao_class = None
+                        # First try to find a direct subclass
                         for subclass in cls.__subclasses__():
                             if subclass.original_class() == type(field_value):
                                 field_dao_class = subclass
                                 break
+
+                        # If not found, search all subclasses of DataAccessObject
+                        if field_dao_class is None:
+                            for subclass in DataAccessObject.__subclasses__():
+                                if subclass.original_class() == type(field_value):
+                                    field_dao_class = subclass
+                                    break
 
                         if field_dao_class:
                             # Convert the field to a DAO
@@ -225,3 +241,37 @@ class DataAccessObject(Generic[T]):
             original_instance = original_cls()
             memo[id(self)] = original_instance
             return original_instance
+
+    def __repr__(self):
+        cls = self.__class__
+        attr_items: list[tuple[str, object]] = []
+
+        # 1) Try to obtain the SQLAlchemy mapper to get the column order.
+        try:
+            from sqlalchemy.inspection import inspect as _sa_inspect
+
+            mapper = _sa_inspect(cls, raiseerr=False)
+            if mapper is not None:
+                for column in mapper.columns:
+                    key = column.key
+                    # Attributes might be deferred / unloaded, getattr handles that.
+                    if not key.startswith("_"):
+                        attr_items.append((key, getattr(self, key, None)))
+        except Exception:  # pragma: no cover – any error → graceful fallback
+            mapper = None  # noqa: F841 – keep the name for clarity
+
+        # 2) Fallback to type hints declared on the class.
+        if not attr_items and hasattr(cls, "__annotations__"):
+            for key in cls.__annotations__:
+                if not key.startswith("_") and hasattr(self, key):
+                    attr_items.append((key, getattr(self, key)))
+
+                    # 3) Final fallback to whatever is present on the instance.
+        if not attr_items:
+            for key, value in self.__dict__.items():
+                if not key.startswith("_"):
+                    attr_items.append((key, value))
+
+                    # Build the string.
+        inner = ", ".join(f"{k}={v!r}" for k, v in attr_items)
+        return f"{cls.__name__}({inner})"
