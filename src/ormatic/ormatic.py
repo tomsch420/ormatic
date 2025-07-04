@@ -23,6 +23,7 @@ from .custom_types import TypeType
 from .field_info import ParseError, FieldInfo, RelationshipInfo, CustomTypeInfo
 from .parsers import FieldParser
 from .python_file_generator import PythonFileGenerator
+from .sqlalchemy_generator import SQLAlchemyGenerator
 from .utils import ORMaticExplicitMapping, recursive_subclasses
 
 logger = logging.getLogger(__name__)
@@ -195,6 +196,15 @@ class ORMatic:
         """
         self.python_file_generator = PythonFileGenerator(self)
         self.python_file_generator.to_python_file(generator, file)
+
+    def to_sqlalchemy_file(self, file: TextIO):
+        """
+        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic models.
+
+        :param file: The file to write to
+        """
+        sqlalchemy_generator = SQLAlchemyGenerator(self)
+        sqlalchemy_generator.to_sqlalchemy_file(file)
 
 
 @dataclass

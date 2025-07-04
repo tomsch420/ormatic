@@ -7,7 +7,7 @@ from functools import lru_cache
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import Column
-from sqlalchemy.orm import MANYTOONE
+from sqlalchemy.orm import MANYTOONE, DeclarativeBase, declared_attr
 from sqlalchemy.sql.schema import Table
 from typing_extensions import Type, get_args, Dict, Any, TypeVar, Generic
 
@@ -29,7 +29,7 @@ def is_data_column(column: Column):
     return not column.primary_key and len(column.foreign_keys) == 0 and column.name != "polymorphic_type"
 
 
-class DataAccessObject(Generic[T]):
+class DataAccessObject(DeclarativeBase, Generic[T]):
     """
     This class defines the interfaces the DAO classes should implement.
 
@@ -38,7 +38,7 @@ class DataAccessObject(Generic[T]):
     This class describes the necessary functionality.
     """
 
-    __table__: Table  # Declare this for type hinting
+    # __table__: Table  # Declare this for type hinting
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -168,6 +168,10 @@ class DataAccessObject(Generic[T]):
         inner = ", ".join(f"{k}={v!r}" for k, v in attr_items)
         return f"{cls.__name__}({inner})"
 
+    @declared_attr
+    def __tablename__(cls) -> str:
+        return cls.__name__
+
 
 @lru_cache(maxsize=None)
 def get_dao_class(cls: Type):
@@ -175,3 +179,4 @@ def get_dao_class(cls: Type):
         if dao.original_class() == cls:
             return dao
     raise ValueError(f"Could not find a DAO for {cls}")
+

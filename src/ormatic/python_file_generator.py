@@ -49,6 +49,7 @@ def generate_relationship_name_from_ormatic(self, relationship: RelationshipAttr
 
     # For one-to-many relationships, try to find the original field name
     if relationship.type == RelationshipType.ONE_TO_MANY and relationship.foreign_keys:
+
         # Extract the field name from the foreign key
         for fk in relationship.foreign_keys:
             # The foreign key name follows a pattern like: doublepositionaggregator_positions1_id
