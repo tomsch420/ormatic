@@ -29,7 +29,7 @@ class ORMaticTestCase(unittest.TestCase):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         ormatic.ormatic.logger.addHandler(handler)
-        ormatic.ormatic.logger.setLevel(logging.INFO)
+        ormatic.ormatic.logger.setLevel(logging.DEBUG)
 
         cls.mapper_registry = registry()
         cls.engine = create_engine('sqlite:///:memory:')

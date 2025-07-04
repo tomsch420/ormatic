@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import logging
 import types
-from typing import TextIO, Dict, Any, Type
+from typing import TextIO, Type, TYPE_CHECKING
 
-import sqlalchemy
 import sqlacodegen.generators
-from sqlalchemy.orm import registry
+import sqlalchemy
+from sqlacodegen.models import RelationshipAttribute, RelationshipType
 
 from .dao import DataAccessObject
-from .utils import ORMaticExplicitMapping
+if TYPE_CHECKING:
+    from .ormatic import ORMatic
+
 
 logger = logging.getLogger(__name__)
+
 
 def render_class_declaration_dao(self, model) -> str:
     parent_class_name = (
@@ -23,6 +26,7 @@ def render_class_declaration_dao(self, model) -> str:
         return f"class {model.name}({parent_class_name}):"
     else:
         return f"class {model.name}({parent_class_name}, DataAccessObject[{model.name[:-3]}]):"
+
 
 def render_enum_aware_column_type(self, coltype) -> str:
     """
@@ -38,10 +42,24 @@ def render_enum_aware_column_type(self, coltype) -> str:
     return f"Enum({coltype.python_type.__module__}.{coltype.python_type.__name__})"
 
 
+def generate_relationship_name_from_ormatic(self, relationship: RelationshipAttribute,
+                                            global_names: set[str], local_names: set[str]):
+    self.generate_relationship_name_old(relationship, global_names, local_names)
+    # print("------------------ generate_relationship_name ------------------")
+    # if relationship.type == RelationshipType.ONE_TO_MANY:
+    #     # get the table for the relationship.source.name in the ormatic
+    #     for wrapped_table in self.ormatic.class_dict.values():
+    #         if wrapped_table.tablename == relationship.source.table.name:
+    #             for name, rel in wrapped_table.relationships_kwargs.items():
+    #                 print(rel, relationship.foreign_keys)
+
+
 class PythonFileGenerator:
     """
     A class for generating Python files from ORMatic models.
     """
+
+    ormatic: ORMatic
 
     def __init__(self, ormatic):
         """
@@ -51,17 +69,16 @@ class PythonFileGenerator:
         """
         self.ormatic = ormatic
 
-    def apply_monkey_patch(self,  generator: sqlacodegen.generators.DataclassGenerator):
+    def apply_monkey_patch(self, generator: sqlacodegen.generators.DeclarativeGenerator):
         """
         Monkey patches the methods of the generator to reflect the relevant changes with ORMatic.
 
         :param generator: The generator to monkey-patch
         """
-
+        generator.ormatic = self.ormatic
         generator.render_class_declaration_old = generator.render_class_declaration
         generator.render_class_declaration = types.MethodType(
-            render_class_declaration_dao,  # function to bind
-            generator  # bind it to this instance
+            render_class_declaration_dao,  generator
         )
 
         generator.render_column_type_old = generator.render_column_type
@@ -69,7 +86,12 @@ class PythonFileGenerator:
             render_enum_aware_column_type, generator
         )
 
-    def to_python_file(self, generator: sqlacodegen.generators.DataclassGenerator, file: TextIO):
+        generator.generate_relationship_name_old = generator.generate_relationship_name
+        generator.generate_relationship_name = types.MethodType(
+            generate_relationship_name_from_ormatic, generator
+        )
+
+    def to_python_file(self, generator: sqlacodegen.generators.DeclarativeGenerator, file: TextIO):
         """
         Generate a Python file from the ORMatic models.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import sys
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Type, List
 from sqlalchemy import types
 

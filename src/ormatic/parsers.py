@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import Field
-from typing import Any, Dict, Type
 
 import sqlalchemy
-from sqlalchemy import Column, Integer, ForeignKey, JSON
+from sqlalchemy import Column, Integer, JSON
 from sqlalchemy.orm import relationship
-from typing_extensions import List, Optional
 
-from .field_info import FieldInfo, RelationshipInfo, CustomTypeInfo
 from .custom_types import TypeType
+from .field_info import FieldInfo, RelationshipInfo, CustomTypeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +98,8 @@ class FieldParser:
         fk_name = f"{field_info.name}{self.ormatic.foreign_key_postfix}"
 
         # Get the wrapped table from either class_dict or subclass_dict
-        other_wrapped_table = self.ormatic.class_dict.get(field_info.type) or self.ormatic.subclass_dict.get(field_info.type)
+        other_wrapped_table = self.ormatic.class_dict.get(field_info.type) or self.ormatic.subclass_dict.get(
+            field_info.type)
 
         # create a foreign key to field.type
         column = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(other_wrapped_table.full_primary_key_name),
@@ -131,7 +130,8 @@ class FieldParser:
         :param field_info: The "many" side of the relationship.
         """
         # Get the wrapped table from either class_dict or subclass_dict
-        child_wrapped_table = self.ormatic.class_dict.get(field_info.type) or self.ormatic.subclass_dict.get(field_info.type)
+        child_wrapped_table = self.ormatic.class_dict.get(field_info.type) or self.ormatic.subclass_dict.get(
+            field_info.type)
 
         # Check if the field type is a parent class of the current class
         is_parent_class = issubclass(wrapped_table.clazz, field_info.type)
@@ -152,14 +152,15 @@ class FieldParser:
 
         if is_parent_class:
             # For self-referential relationships (when the field type is a parent class)
-            relationship_kwargs["primaryjoin"] = f"{wrapped_table.full_primary_key_name} == foreign({child_wrapped_table.full_primary_key_name})"
+            relationship_kwargs[
+                "primaryjoin"] = f"{wrapped_table.full_primary_key_name} == foreign({child_wrapped_table.full_primary_key_name})"
             relationship_kwargs["remote_side"] = [child_wrapped_table.primary_key]
         else:
             relationship_kwargs["foreign_keys"] = [fk]
 
         relationship_ = sqlalchemy.orm.relationship(field_info.type, **relationship_kwargs)
         relationship_info = RelationshipInfo(foreign_key_name=fk_name, relationship=relationship_,
-                                             field_info=field_info, )
+                                             field_info=field_info)
         wrapped_table.one_to_many_relationships.append(relationship_info)
 
     def create_custom_type_column(self, wrapped_table, field_info: FieldInfo):

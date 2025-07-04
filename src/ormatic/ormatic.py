@@ -159,8 +159,6 @@ class ORMatic:
             # Parse all classes, including those that implement ORMaticExplicitMapping
             self.parse_class(wrapped_table)
 
-        # Do not parse fields for subclasses that are not in the original list
-        # They should only be mapped to tables without any columns
 
     def parse_class(self, wrapped_table: WrappedTable):
         """
@@ -342,6 +340,10 @@ class WrappedTable:
             kwargs["polymorphic_identity"] = f"{self.clazz.__module__}.{self.clazz.__name__}"
             kwargs["inherits"] = self.parent_class.mapped_table
 
+        # print("=" * 80)
+        # print(self.clazz)
+        # print(kwargs)
+        # print("=" * 80)
         return kwargs
 
     def mapper_kwargs_for_python_file(self, ormatic: ORMatic) -> str:
