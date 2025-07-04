@@ -1,2 +1,3 @@
 sqlalchemy
 networkx
+jinja2

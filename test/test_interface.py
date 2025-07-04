@@ -5,8 +5,8 @@ import unittest
 from sqlalchemy import create_engine, Engine, select
 from sqlalchemy.orm import registry, Session
 
-from classes.example_classes import Element, PhysicalObject
-from classes.orm_interface import *
+from classes.example_classes import *
+from classes.sqlalchemy_interface import *
 import ormatic.dao
 
 

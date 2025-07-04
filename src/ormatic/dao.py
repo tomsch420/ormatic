@@ -29,7 +29,7 @@ def is_data_column(column: Column):
     return not column.primary_key and len(column.foreign_keys) == 0 and column.name != "polymorphic_type"
 
 
-class DataAccessObject(DeclarativeBase, Generic[T]):
+class DataAccessObject(Generic[T]):
     """
     This class defines the interfaces the DAO classes should implement.
 

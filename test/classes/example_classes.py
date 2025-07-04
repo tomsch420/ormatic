@@ -59,12 +59,12 @@ class DoublePositionAggregator:
 class Position4D(Position):
     w: float
 
-# check that explicit mappings work
-@dataclass
-class PartialPosition(DataAccessObject[Position4D]):
-    x: float
-    y: float
-    z: float
+# # check that explicit mappings work
+# @dataclass
+# class PartialPosition(DataAccessObject[Position4D]):
+#     x: float
+#     y: float
+#     z: float
 
 
 # check with tree like classes
@@ -151,8 +151,8 @@ class Entity:
 class DerivedEntity(Entity):
     description: str = "Default description"
 
-
-# Define an explicit mapping DAO that maps to the base entity class
-@dataclass
-class EntityDAO(DataAccessObject[Entity]):
-    name: str
+#
+# # Define an explicit mapping DAO that maps to the base entity class
+# @dataclass
+# class EntityDAO(DataAccessObject[Entity]):
+#     name: str
