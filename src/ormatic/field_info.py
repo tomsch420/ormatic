@@ -59,8 +59,10 @@ class FieldInfo:
 
     is_type_field: bool = False
 
-    def __init__(self, clazz: Type, f: Field):
+    field: Field = None
 
+    def __init__(self, clazz: Type, f: Field):
+        self.field = f
         self.name = f.name
         self.clazz = clazz
 

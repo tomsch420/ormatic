@@ -72,8 +72,9 @@ class SQLAlchemyGenerator:
 
         # Render the template
         output = template.render(
-            wrapped_tables=self.ormatic.class_dict.values(),
-            module_imports=module_imports
+            wrapped_tables=self.ormatic.wrapped_tables,
+            module_imports=module_imports,
+            extra_imports=self.ormatic.extra_imports,
         )
 
         # Write the output to the file

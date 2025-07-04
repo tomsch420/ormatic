@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import inspect
+import datetime
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from functools import lru_cache
 from typing import Type, List
 from sqlalchemy import types
@@ -41,12 +43,4 @@ def recursive_subclasses(cls):
     """
     return cls.__subclasses__() + [g for s in cls.__subclasses__() for g in recursive_subclasses(s)]
 
-@dataclass
-class ORMaticExplicitMapping:
-    """
-    Abstract class that is used to mark a class as an explicit mapping.
-    """
-
-    @classproperty
-    def explicit_mapping(cls) -> Type:
-        raise NotImplementedError
+leaf_types = (int, float, str, Enum, datetime.datetime, bool)

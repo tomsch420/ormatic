@@ -2,10 +2,16 @@
 
 from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Enum, JSON
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from typing_extensions import Optional, List
+
 {% for module in module_imports %}
 import {{ module }}
 {% endfor %}
+
+{%- for module, classes in extra_imports.items() %}
+from {{ module }} import {{ ", ".join(classes) }}
+{%- endfor %}
 
 
 from ormatic.dao import DataAccessObject
@@ -23,31 +29,31 @@ Base = declarative_base()
 {#        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'#}
 {#    }#}
 {#{% else %}#}
-class {{ table.tablename }}(Base, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):
+class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):
     __tablename__ = '{{ table.tablename }}'
 
-    {{ table.primary_key_name }} = {{ table.primary_key }}
-
-    {% if table.is_root_of_non_empty_inheritance_structure %}
-    {{ table.polymorphic_on_name }} = Column(String(255))
-    __mapper_args__ = {
-        'polymorphic_on': {{ table.polymorphic_on_name }},
-        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'
-    }
-    {% endif %}
+    {{ table.primary_key_name }}: Mapped[int] = {{ table.primary_key }}
+{##}
+{#    {% if table.is_root_of_non_empty_inheritance_structure %}#}
+{#    {{ table.polymorphic_on_name }} = Column(String(255))#}
+{#    __mapper_args__ = {#}
+{#        'polymorphic_on': {{ table.polymorphic_on_name }},#}
+{#        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'#}
+{#    }#}
+{#    {% endif %}#}
 {#{% endif %}#}
 
-    {% for column in table.columns %}
-    {{ column.name }} = {{ column_format(column) }}
+    {% for name, type in table.builtin_columns %}
+    {{ name }}: {{ type }}
     {% endfor %}
 
-    {% for rel_info in table.one_to_one_relationships %}
-    {{ rel_info.field_info.name }} = {{ relationship_format(rel_info, False) }}
-    {% endfor %}
-
-    {% for rel_info in table.one_to_many_relationships %}
-    {{ rel_info.field_info.name }} = {{ relationship_format(rel_info, True) }}
-    {% endfor %}
+{#    {% for rel_info in table.one_to_one_relationships %}#}
+{#    {{ rel_info.field_info.name }} = {{ relationship_format(rel_info, False) }}#}
+{#    {% endfor %}#}
+{##}
+{#    {% for rel_info in table.one_to_many_relationships %}#}
+{#    {{ rel_info.field_info.name }} = {{ relationship_format(rel_info, True) }}#}
+{#    {% endfor %}#}
 
 
 {% endfor %}
