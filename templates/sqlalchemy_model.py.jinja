@@ -12,21 +12,21 @@ from ormatic.dao import DataAccessObject
 
 Base = declarative_base()
 
-{% for table in tables %}
-{% if table.parent_class %}
-class {{ table.tablename }}({{ table.parent_class.tablename }}, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):
-    __tablename__ = '{{ table.tablename }}'
-
-    {{ table.primary_key_name }} = Column(Integer, ForeignKey('{{ table.parent_class.tablename }}.{{ table.primary_key_name }}'), primary_key=True)
-
-    __mapper_args__ = {
-        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'
-    }
-{% else %}
+{% for table in wrapped_tables %}
+{#{% if table.parent_class %}#}
+{#class {{ table.tablename }}({{ table.parent_class.tablename }}, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):#}
+{#    __tablename__ = '{{ table.tablename }}'#}
+{##}
+{#    {{ table.primary_key_name }} = {{ table.primary_key }}#}
+{##}
+{#    __mapper_args__ = {#}
+{#        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'#}
+{#    }#}
+{#{% else %}#}
 class {{ table.tablename }}(Base, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):
     __tablename__ = '{{ table.tablename }}'
 
-    {{ table.primary_key_name }} = Column(Integer, primary_key=True)
+    {{ table.primary_key_name }} = {{ table.primary_key }}
 
     {% if table.is_root_of_non_empty_inheritance_structure %}
     {{ table.polymorphic_on_name }} = Column(String(255))
@@ -35,7 +35,7 @@ class {{ table.tablename }}(Base, DataAccessObject[{{ table.clazz.__module__ }}.
         'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'
     }
     {% endif %}
-{% endif %}
+{#{% endif %}#}
 
     {% for column in table.columns %}
     {{ column.name }} = {{ column_format(column) }}

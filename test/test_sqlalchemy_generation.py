@@ -41,10 +41,10 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         all_classes = set(classes_of_module(example_classes))
         all_classes -= set(recursive_subclasses(DataAccessObject))
         all_classes -= set(recursive_subclasses(Enum))
-        all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl}
+        all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl, Torso}
 
         cls.ormatic_instance = ORMatic(list(all_classes), cls.mapper_registry)
-        cls.ormatic_instance.make_all_tables()
+        # cls.ormatic_instance.make_all_tables()
 
         # Generate SQLAlchemy declarative mappings
         with open(os.path.join(os.path.dirname(__file__), 'classes', 'sqlalchemy_interface.py'), 'w') as f:

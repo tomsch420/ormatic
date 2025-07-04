@@ -1,13 +1,15 @@
 import logging
+import os
 import sys
 import unittest
-
 from sqlalchemy import create_engine, Engine, select
-from sqlalchemy.orm import registry, Session
+from sqlalchemy.orm import registry, Session, configure_mappers
 
 from classes.example_classes import *
-from classes.sqlalchemy_interface import *
 import ormatic.dao
+from ormatic.ormatic import ORMatic
+from ormatic.utils import classes_of_module, recursive_subclasses
+from classes.sqlalchemy_interface import *
 
 
 class InterfaceTestCase(unittest.TestCase):
@@ -21,6 +23,7 @@ class InterfaceTestCase(unittest.TestCase):
         handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         ormatic.dao.logger.addHandler(handler)
         ormatic.dao.logger.setLevel(logging.INFO)
+        configure_mappers()
 
         cls.engine = create_engine('sqlite:///:memory:')
         cls.session = Session(cls.engine)
@@ -237,15 +240,15 @@ class InterfaceTestCase(unittest.TestCase):
 
     def test_double_position_aggregator(self):
         # Skip this test for now due to issues with relationship handling
-        pass
+        self.skipTest("Skipping test due to issues with relationship handling")
 
     def test_kinematic_chain_and_torso(self):
         # Skip this test for now due to issues with relationship handling
-        pass
+        self.skipTest("Skipping test due to issues with relationship handling")
 
     def test_original_simulated_object_and_annotation(self):
         # Skip this test for now due to issues with relationship handling
-        pass
+        self.skipTest("Skipping test due to issues with relationship handling")
 
 
 if __name__ == '__main__':

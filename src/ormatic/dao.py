@@ -168,9 +168,9 @@ class DataAccessObject(Generic[T]):
         inner = ", ".join(f"{k}={v!r}" for k, v in attr_items)
         return f"{cls.__name__}({inner})"
 
-    @declared_attr
-    def __tablename__(cls) -> str:
-        return cls.__name__
+    # @declared_attr
+    # def __tablename__(cls) -> str:
+    #     return cls.__name__
 
 
 @lru_cache(maxsize=None)

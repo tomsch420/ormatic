@@ -34,10 +34,10 @@ class ORMatic:
     ORMatic is a tool for generating SQLAlchemy ORM models from a set of dataclasses.
     """
 
-    mapper_registry: registry
-    """
-    The SQLAlchemy mapper registry. This is needed for the relationship configuration.
-    """
+    # mapper_registry: registry
+    # """
+    # The SQLAlchemy mapper registry. This is needed for the relationship configuration.
+    # """
 
     class_dict: Dict[Type, WrappedTable]
     """
@@ -60,7 +60,9 @@ class ORMatic:
     A dict of classes that are explicitly mapped to SQLAlchemy tables.
     """
 
-    def __init__(self, classes: List[Type], mapper_registry: registry, type_mappings: Dict[Type, Any] = None):
+    def __init__(self, classes: List[Type],
+                 # mapper_registry: registry,
+                 type_mappings: Dict[Type, Any] = None):
         """
         :param classes: The list of classes to be mapped.
         :param mapper_registry: The SQLAlchemy mapper registry. This is needed for the relationship configuration.
@@ -68,7 +70,7 @@ class ORMatic:
 
         #  initialize the instance variables
         self.type_mappings = type_mappings or {}
-        self.mapper_registry = mapper_registry
+        # self.mapper_registry = mapper_registry
         self.class_dict = {}
 
         self.explicitly_mapped_classes = {}
@@ -132,24 +134,24 @@ class ORMatic:
                 if base in all_classes:
                     self.class_dependency_graph.add_edge(base, clazz)
 
-    def make_all_tables(self) -> Dict[Type, Mapper]:
-        """
-        Create all the SQLAlchemy tables from the classes in the class_dict
-
-        :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
-        """
-        result = {}
-
-        # Create a set of classes that are targets of explicit mappings
-        explicit_mapping_targets = set(self.explicitly_mapped_classes.values())
-
-        # Add tables from class_dict
-        for wrapped_table in self.class_dict.values():
-            # Skip classes that are targets of explicit mappings
-            if wrapped_table.clazz not in explicit_mapping_targets:
-                result[wrapped_table.clazz] = wrapped_table.mapped_table
-
-        return result
+    # def make_all_tables(self) -> Dict[Type, Mapper]:
+    #     """
+    #     Create all the SQLAlchemy tables from the classes in the class_dict
+    #
+    #     :return: A dictionary mapping classes to their corresponding SQLAlchemy tables.
+    #     """
+    #     result = {}
+    #
+    #     # Create a set of classes that are targets of explicit mappings
+    #     explicit_mapping_targets = set(self.explicitly_mapped_classes.values())
+    #
+    #     # Add tables from class_dict
+    #     for wrapped_table in self.class_dict.values():
+    #         # Skip classes that are targets of explicit mappings
+    #         if wrapped_table.clazz not in explicit_mapping_targets:
+    #             result[wrapped_table.clazz] = wrapped_table.mapped_table
+    #
+    #     return result
 
     def parse_classes(self):
         """

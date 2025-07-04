@@ -25,6 +25,16 @@ class SQLAlchemyGenerator:
     Uses Jinja2 templates for code generation.
     """
 
+    env: jinja2.Environment
+    """
+    The environment to use with jinja2.
+    """
+
+    ormatic: ORMatic
+    """
+    The ORMatic instance that created this SQLAlchemyGenerator.
+    """
+
     def __init__(self, ormatic: ORMatic):
         """
         Initialize the SQLAlchemyGenerator with a reference to the ORMatic instance.
@@ -62,7 +72,7 @@ class SQLAlchemyGenerator:
 
         # Render the template
         output = template.render(
-            tables=self.ormatic.class_dict.values(),
+            wrapped_tables=self.ormatic.class_dict.values(),
             module_imports=module_imports
         )
 
@@ -193,6 +203,12 @@ class SQLAlchemyGenerator:
         if hasattr(rel_info.relationship, 'foreign_keys') and rel_info.relationship.foreign_keys:
             fk_names = [f"[{rel_info.foreign_key_name}]"]
             args.append(f"foreign_keys={', '.join(fk_names)}")
+        # For one-to-many relationships, specify the foreign key column
+        elif is_one_to_many:
+            # Use the foreign_key_name from the relationship info
+            fk_name = rel_info.foreign_key_name
+            # Add the foreign key argument
+            args.append(f"foreign_keys='[{target_class}.{fk_name}]'")
 
         # Add uselist for one-to-many relationships
         if is_one_to_many:

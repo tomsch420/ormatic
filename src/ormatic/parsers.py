@@ -21,7 +21,7 @@ class FieldParser:
     def __init__(self, ormatic):
         """
         Initialize the FieldParser with a reference to the ORMatic instance.
-        
+
         :param ormatic: The ORMatic instance that created this FieldParser.
         """
         self.ormatic = ormatic
@@ -141,9 +141,8 @@ class FieldParser:
         fk = sqlalchemy.Column(fk_name, Integer, sqlalchemy.ForeignKey(wrapped_table.full_primary_key_name),
                                nullable=True)
 
-        # Only add the foreign key to the child table if it's not a parent class
-        if not is_parent_class:
-            child_wrapped_table.columns.append(fk)
+        # Always add the foreign key to the child table
+        child_wrapped_table.columns.append(fk)
 
         # add a relationship to this table holding the list of objects from the field.type table
         relationship_kwargs = {
