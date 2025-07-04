@@ -214,7 +214,6 @@ class InterfaceTestCase(unittest.TestCase):
     def test_position_type_wrapper(self):
         wrapper = PositionTypeWrapper(Position)
         dao = PositionTypeWrapperDAO.to_dao(wrapper)
-        print(dao)
         self.assertEqual(dao.position_type, wrapper.position_type)
         self.session.add(dao)
         self.session.commit()
@@ -223,8 +222,18 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(result, dao)
 
     def test_positions(self):
-        # Skip this test for now due to issues with relationship handling
-        pass
+        p1 = Position(1, 2, 3)
+        p2 = Position(2, 3, 4)
+        positions = Positions([p1, p2], ["a", "b", "c"])
+        dao = PositionsDAO.to_dao(positions)
+
+        self.session.add(dao)
+        self.session.commit()
+
+        result = self.session.scalars(select(PositionsDAO)).one()
+        self.assertEqual(result.some_strings, positions.some_strings)
+        self.assertEqual(len(result.positions), 2)
+
 
     def test_double_position_aggregator(self):
         # Skip this test for now due to issues with relationship handling
