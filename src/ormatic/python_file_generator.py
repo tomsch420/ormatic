@@ -44,14 +44,25 @@ def render_enum_aware_column_type(self, coltype) -> str:
 
 def generate_relationship_name_from_ormatic(self, relationship: RelationshipAttribute,
                                             global_names: set[str], local_names: set[str]):
+    # First, generate a default name using the original method
     self.generate_relationship_name_old(relationship, global_names, local_names)
-    # print("------------------ generate_relationship_name ------------------")
-    # if relationship.type == RelationshipType.ONE_TO_MANY:
-    #     # get the table for the relationship.source.name in the ormatic
-    #     for wrapped_table in self.ormatic.class_dict.values():
-    #         if wrapped_table.tablename == relationship.source.table.name:
-    #             for name, rel in wrapped_table.relationships_kwargs.items():
-    #                 print(rel, relationship.foreign_keys)
+
+    # For one-to-many relationships, try to find the original field name
+    if relationship.type == RelationshipType.ONE_TO_MANY and relationship.foreign_keys:
+        # Extract the field name from the foreign key
+        for fk in relationship.foreign_keys:
+            # The foreign key name follows a pattern like: doublepositionaggregator_positions1_id
+            # We need to extract the field name (positions1) from it
+            fk_name = fk.column.name
+            if '_' in fk_name and fk_name.endswith('_id'):
+                # Remove the _id suffix
+                base_name = fk_name[:-3]
+                # Extract the field name after the last underscore
+                parts = base_name.split('_')
+                if len(parts) > 1:
+                    field_name = parts[-1]
+                    # Use the field name as the relationship name
+                    relationship.name = self.find_free_name(field_name, global_names, local_names)
 
 
 class PythonFileGenerator:

@@ -340,10 +340,6 @@ class WrappedTable:
             kwargs["polymorphic_identity"] = f"{self.clazz.__module__}.{self.clazz.__name__}"
             kwargs["inherits"] = self.parent_class.mapped_table
 
-        # print("=" * 80)
-        # print(self.clazz)
-        # print(kwargs)
-        # print("=" * 80)
         return kwargs
 
     def mapper_kwargs_for_python_file(self, ormatic: ORMatic) -> str:

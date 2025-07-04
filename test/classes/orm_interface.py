@@ -25,8 +25,8 @@ class DoublePositionAggregatorDAO(Base, DataAccessObject[DoublePositionAggregato
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    PositionDAO: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions1_id]', back_populates='doublepositionaggregator_positions1')
-    PositionDAO_: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions2_id]', back_populates='doublepositionaggregator_positions2')
+    positions1: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions1_id]', back_populates='doublepositionaggregator_positions1')
+    positions2: Mapped[List['PositionDAO']] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregator_positions2_id]', back_populates='doublepositionaggregator_positions2')
 
 
 class EntityDAO(Base, DataAccessObject[Entity]):
@@ -112,13 +112,13 @@ class PositionDAO(Base, DataAccessObject[Position]):
     x: Mapped[float] = mapped_column(Float)
     y: Mapped[float] = mapped_column(Float)
     z: Mapped[float] = mapped_column(Float)
-    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     doublepositionaggregator_positions1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
     doublepositionaggregator_positions2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id'))
+    positions_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
     polymorphic_type: Mapped[Optional[str]] = mapped_column(String(255))
 
-    doublepositionaggregator_positions1: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions1_id], back_populates='PositionDAO')
-    doublepositionaggregator_positions2: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions2_id], back_populates='PositionDAO_')
+    doublepositionaggregator_positions1: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions1_id], back_populates='positions1')
+    doublepositionaggregator_positions2: Mapped[Optional['DoublePositionAggregatorDAO']] = relationship('DoublePositionAggregatorDAO', foreign_keys=[doublepositionaggregator_positions2_id], back_populates='positions2')
     positions_positions: Mapped[Optional['PositionsDAO']] = relationship('PositionsDAO', back_populates='PositionDAO')
     PoseDAO: Mapped[List['PoseDAO']] = relationship('PoseDAO', back_populates='position')
 

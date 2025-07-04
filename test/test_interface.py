@@ -220,7 +220,7 @@ class InterfaceTestCase(unittest.TestCase):
         self.session.commit()
 
         result = self.session.scalars(select(PositionTypeWrapperDAO)).one()
-        self.assertEqual(result, wrapper)
+        self.assertEqual(result, dao)
 
     def test_positions(self):
         # Skip this test for now due to issues with relationship handling
