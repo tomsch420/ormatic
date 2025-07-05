@@ -24,15 +24,7 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ tab
     __tablename__ = '{{ table.tablename }}'
 
     {{ table.primary_key_name }}: Mapped[int] = {{ table.primary_key }}
-{##}
-{#    {% if table.is_root_of_non_empty_inheritance_structure %}#}
-{#    {{ table.polymorphic_on_name }} = Column(String(255))#}
-{#    __mapper_args__ = {#}
-{#        'polymorphic_on': {{ table.polymorphic_on_name }},#}
-{#        'polymorphic_identity': '{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}'#}
-{#    }#}
-{#    {% endif %}#}
-{#{% endif %}#}
+
     {% for name, type in table.builtin_columns %}
     {{ name }}: {{ type }}
     {% endfor %}
@@ -49,11 +41,12 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ tab
     {{ name }}: {{ type }} = {{ constructor }}
     {% endfor %}
 
-    __mapper_args__ = {{ table.mapper_args }}
-{##}
-{#    {% for rel_info in table.one_to_many_relationships %}#}
-{#    {{ rel_info.field_info.name }} = {{ relationship_format(rel_info, True) }}#}
-{#    {% endfor %}#}
-
+    {% if table.mapper_args %}#}
+    __mapper_args__ = {
+    {% for key, value in table.mapper_args.items() %}
+        {{ key }}: {{ value }},
+    {% endfor %}
+    }
+    {% endif %}
 
 {% endfor %}

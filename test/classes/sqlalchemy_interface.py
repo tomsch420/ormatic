@@ -17,6 +17,7 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
     __tablename__ = 'AtomDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     element: Mapped[Element]
     type: Mapped[int]
     charge: Mapped[float]
@@ -24,21 +25,40 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
 
 
 
-    __mapper_args__ = {}
-
 
 class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
     __tablename__ = 'ParentDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     name: Mapped[str]
     polymorphic_type: Mapped[str]
 
 
 
 
-    __mapper_args__ = {'polymorphic_on': 'polymorphic_type', 'polymorphic_identity': 'ParentDAO'}
+#}
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'ParentDAO',
+        }
 
+class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
+    __tablename__ = 'EntityDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    name: Mapped[str]
+    polymorphic_type: Mapped[str]
+
+
+
+
+#}
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'EntityDAO',
+        }
 
 class DoublePositionAggregatorDAO(Base, DataAccessObject[classes.example_classes.DoublePositionAggregator]):
     __tablename__ = 'DoublePositionAggregatorDAO'
@@ -47,11 +67,28 @@ class DoublePositionAggregatorDAO(Base, DataAccessObject[classes.example_classes
 
 
 
+
     positions1: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregatordao_positions1_id]')
     positions2: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregatordao_positions2_id]')
 
-    __mapper_args__ = {}
 
+class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.KinematicChain]):
+    __tablename__ = 'KinematicChainDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    name: Mapped[str]
+    polymorphic_type: Mapped[str]
+
+
+    torsodao_kinematic_chains_id: Mapped[Optional[int]] = mapped_column(ForeignKey('TorsoDAO.id'))
+
+
+#}
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'KinematicChainDAO',
+        }
 
 class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     __tablename__ = 'NodeDAO'
@@ -59,17 +96,17 @@ class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
+
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'), nullable=True)
 
     parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id])
-
-    __mapper_args__ = {}
 
 
 class OrientationDAO(Base, DataAccessObject[classes.example_classes.Orientation]):
     __tablename__ = 'OrientationDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     x: Mapped[float]
     y: Mapped[float]
     z: Mapped[float]
@@ -78,13 +115,12 @@ class OrientationDAO(Base, DataAccessObject[classes.example_classes.Orientation]
 
 
 
-    __mapper_args__ = {}
-
 
 class PoseDAO(Base, DataAccessObject[classes.example_classes.Pose]):
     __tablename__ = 'PoseDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
 
 
     position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), nullable=False)
@@ -93,13 +129,12 @@ class PoseDAO(Base, DataAccessObject[classes.example_classes.Pose]):
     position: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[position_id])
     orientation: Mapped[OrientationDAO] = relationship('OrientationDAO', uselist=False, foreign_keys=[orientation_id])
 
-    __mapper_args__ = {}
-
 
 class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
     __tablename__ = 'PositionDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     x: Mapped[float]
     y: Mapped[float]
     z: Mapped[float]
@@ -111,19 +146,21 @@ class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
     positionsdao_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
 
 
-    __mapper_args__ = {'polymorphic_on': 'polymorphic_type', 'polymorphic_identity': 'PositionDAO'}
-
+#}
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'PositionDAO',
+        }
 
 class PositionTypeWrapperDAO(Base, DataAccessObject[classes.example_classes.PositionTypeWrapper]):
     __tablename__ = 'PositionTypeWrapperDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
+
     position_type: Mapped[str] = mapped_column(TypeType, nullable=False)
 
 
-
-    __mapper_args__ = {}
 
 
 class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
@@ -131,35 +168,74 @@ class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
+
     some_strings: Mapped[List[str]] = mapped_column(JSON, nullable=False)
 
 
     positions: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.positionsdao_positions_id]')
-
-    __mapper_args__ = {}
 
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):
     __tablename__ = 'ChildMappedDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey(ParentDAO.id), primary_key=True)
+
     attribute1: Mapped[int]
 
 
 
 
-    __mapper_args__ = {'polymorphic_on': 'polymorphic_type', 'polymorphic_identity': 'ChildMappedDAO'}
+#}
+    __mapper_args__ = {
+        'polymorphic_identity': 'ChildMappedDAO',
+        'inherit_condition': id == ParentDAO.id,
+        }
 
+class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.DerivedEntity]):
+    __tablename__ = 'DerivedEntityDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(EntityDAO.id), primary_key=True)
+
+    description: Mapped[str]
+
+
+
+
+#}
+    __mapper_args__ = {
+        'polymorphic_identity': 'DerivedEntityDAO',
+        'inherit_condition': id == EntityDAO.id,
+        }
+
+class TorsoDAO(KinematicChainDAO, DataAccessObject[classes.example_classes.Torso]):
+    __tablename__ = 'TorsoDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(KinematicChainDAO.id), primary_key=True)
+
+
+
+
+    kinematic_chains: Mapped[List[KinematicChainDAO]] = relationship('KinematicChainDAO', foreign_keys='[KinematicChainDAO.torsodao_kinematic_chains_id]')
+
+#}
+    __mapper_args__ = {
+        'polymorphic_identity': 'TorsoDAO',
+        'inherit_condition': id == KinematicChainDAO.id,
+        }
 
 class Position4DDAO(PositionDAO, DataAccessObject[classes.example_classes.Position4D]):
     __tablename__ = 'Position4DDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey(PositionDAO.id), primary_key=True)
+
     w: Mapped[float]
 
 
 
 
-    __mapper_args__ = {'polymorphic_on': 'polymorphic_type', 'polymorphic_identity': 'Position4DDAO'}
-
+#}
+    __mapper_args__ = {
+        'polymorphic_identity': 'Position4DDAO',
+        'inherit_condition': id == PositionDAO.id,
+        }
 

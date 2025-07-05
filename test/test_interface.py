@@ -43,7 +43,7 @@ class InterfaceTestCase(unittest.TestCase):
     def test_position(self):
         p1 = Position(1, 2, 3)
 
-        p1dao = PositionDAO.to_dao(p1)
+        p1dao: PositionDAO = PositionDAO.to_dao(p1)
         self.assertEqual(p1.x, p1dao.x)
         self.assertEqual(p1.y, p1dao.y)
         self.assertEqual(p1.z, p1dao.z)
@@ -142,36 +142,36 @@ class InterfaceTestCase(unittest.TestCase):
         # atom_from_session = queried.from_dao()
         # self.assertEqual(atom, atom_from_session)
 
-    #
-    # def test_entity_and_derived(self):
-    #     entity = Entity("TestEntity")
-    #     derived = DerivedEntity("DerivedEntity", "Test Description")
-    #
-    #     entity_dao = EntityDAO.to_dao(entity)
-    #     derived_dao = DerivedEntityDAO.to_dao(derived)
-    #
-    #     self.assertEqual(entity.name, entity_dao.name)
-    #     self.assertEqual(derived.name, derived_dao.name)
-    #     self.assertEqual(derived.description, derived_dao.description)
-    #
-    #     self.session.add(entity_dao)
-    #     self.session.add(derived_dao)
-    #     self.session.commit()
-    #
-    #     # test the content of the database
-    #     queried_entity = self.session.scalars(select(EntityDAO)).first()
-    #     queried_derived = self.session.scalars(select(DerivedEntityDAO)).first()
-    #
-    #     self.assertEqual(entity.name, queried_entity.name)
-    #     self.assertEqual(derived.name, queried_derived.name)
-    #     self.assertEqual(derived.description, queried_derived.description)
-    #
-    #     # entity_reconstructed = queried_entity.from_dao()
-    #     # derived_reconstructed = queried_derived.from_dao()
-    #     #
-    #     # self.assertEqual(entity.name, entity_reconstructed.name)
-    #     # self.assertEqual(derived.name, derived_reconstructed.name)
-    #     # self.assertEqual(derived.description, derived_reconstructed.description)
+
+    def test_entity_and_derived(self):
+        entity = Entity("TestEntity")
+        derived = DerivedEntity("DerivedEntity", "Test Description")
+
+        entity_dao = EntityDAO.to_dao(entity)
+        derived_dao = DerivedEntityDAO.to_dao(derived)
+
+        self.assertEqual(entity.name, entity_dao.name)
+        self.assertEqual(derived.name, derived_dao.name)
+        self.assertEqual(derived.description, derived_dao.description)
+
+        self.session.add(entity_dao)
+        self.session.add(derived_dao)
+        self.session.commit()
+
+        # test the content of the database
+        queried_entity = self.session.scalars(select(EntityDAO)).first()
+        queried_derived = self.session.scalars(select(DerivedEntityDAO)).first()
+
+        self.assertEqual(entity.name, queried_entity.name)
+        self.assertEqual(derived.name, queried_derived.name)
+        self.assertEqual(derived.description, queried_derived.description)
+
+        # entity_reconstructed = queried_entity.from_dao()
+        # derived_reconstructed = queried_derived.from_dao()
+        #
+        # self.assertEqual(entity.name, entity_reconstructed.name)
+        # self.assertEqual(derived.name, derived_reconstructed.name)
+        # self.assertEqual(derived.description, derived_reconstructed.description)
     #
     def test_parent_and_child(self):
         parent = Parent("TestParent")
@@ -206,7 +206,6 @@ class InterfaceTestCase(unittest.TestCase):
 
     def test_node(self):
 
-        # TODO somehow make the to_dao method also take the related node n3 here into account
         n1 = Node()
         n2 = Node(parent=n1)
         n3 = Node(parent=n1)
@@ -262,14 +261,19 @@ class InterfaceTestCase(unittest.TestCase):
         queried = self.session.scalars(select(DoublePositionAggregatorDAO)).one()
         self.assertEqual(queried, dpa_dao)
 
-    #
-    # def test_kinematic_chain_and_torso(self):
-    #     # Skip this test for now due to issues with relationship handling
-    #     self.skipTest("Skipping test due to issues with relationship handling")
+
+    def test_kinematic_chain_and_torso(self):
+        k1 = KinematicChain("a")
+        k2 = KinematicChain("b")
+        torso = Torso("t", [k1 ,k2])
+        torso_dao = TorsoDAO.to_dao(torso)
     #
     # def test_original_simulated_object_and_annotation(self):
     #     # Skip this test for now due to issues with relationship handling
     #     self.skipTest("Skipping test due to issues with relationship handling")
+
+    def test_custom_types(self):
+        ...
 
 
 if __name__ == '__main__':

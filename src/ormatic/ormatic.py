@@ -185,13 +185,22 @@ class WrappedTable:
         return self.ormatic.class_dependency_graph.successors(self.index)
 
     def create_mapper_args(self):
-        if len(self.child_tables) > 0 or self.parent_table is not None:
+
+        # this is the root of an inheritance structure
+        if self.parent_table is None and len(self.child_tables) > 0:
+            self.builtin_columns.append((self.polymorphic_on_name, "Mapped[str]"))
             self.mapper_args.update({
-                "polymorphic_on": self.polymorphic_on_name,
-                "polymorphic_identity": f"{self.tablename}"
+                "'polymorphic_on'": f"'{self.polymorphic_on_name}'",
+                "'polymorphic_identity'": f"'{self.tablename}'",
             })
-            if self.parent_table is None :
-                self.builtin_columns.append((self.polymorphic_on_name, "Mapped[str]"))
+
+        # this inherits from something
+        if self.parent_table is not None:
+            self.mapper_args.update({
+                "'polymorphic_identity'": f"'{self.tablename}'",
+                "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}"
+            })
+
 
     @cached_property
     def full_primary_key_name(self):

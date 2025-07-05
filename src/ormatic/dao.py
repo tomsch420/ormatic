@@ -38,8 +38,6 @@ class DataAccessObject(Generic[T]):
     This class describes the necessary functionality.
     """
 
-    # __table__: Table  # Declare this for type hinting
-
     @classmethod
     @lru_cache(maxsize=None)
     def original_class(cls) -> Type:
