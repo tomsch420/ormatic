@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Enum, JSON
-from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base
-from typing_extensions import Optional, List
+from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
+from typing_extensions import Optional, List, Type
 
 import classes.example_classes
+import ormatic.custom_types
 from classes.example_classes import Element
 
 from ormatic.dao import DataAccessObject
 from ormatic.custom_types import TypeType
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    type_mappings = {
+        Type: TypeType,
+        classes.example_classes.PhysicalObject: ormatic.custom_types.TypeType,
+    }
+
 
 class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
     __tablename__ = 'AtomDAO'
@@ -41,7 +47,7 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'ParentDAO',
-        }
+    }
 
 class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
     __tablename__ = 'EntityDAO'
@@ -58,7 +64,7 @@ class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'EntityDAO',
-        }
+    }
 
 class DoublePositionAggregatorDAO(Base, DataAccessObject[classes.example_classes.DoublePositionAggregator]):
     __tablename__ = 'DoublePositionAggregatorDAO'
@@ -88,7 +94,7 @@ class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.Kinematic
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'KinematicChainDAO',
-        }
+    }
 
 class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     __tablename__ = 'NodeDAO'
@@ -111,6 +117,17 @@ class OrientationDAO(Base, DataAccessObject[classes.example_classes.Orientation]
     y: Mapped[float]
     z: Mapped[float]
     w: Mapped[Optional[float]]
+
+
+
+
+
+class OriginalSimulatedObjectDAO(Base, DataAccessObject[classes.example_classes.OriginalSimulatedObject]):
+    __tablename__ = 'OriginalSimulatedObjectDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    placeholder: Mapped[float]
 
 
 
@@ -150,7 +167,7 @@ class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'PositionDAO',
-        }
+    }
 
 class PositionTypeWrapperDAO(Base, DataAccessObject[classes.example_classes.PositionTypeWrapper]):
     __tablename__ = 'PositionTypeWrapperDAO'
@@ -158,7 +175,7 @@ class PositionTypeWrapperDAO(Base, DataAccessObject[classes.example_classes.Posi
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
-    position_type: Mapped[str] = mapped_column(TypeType, nullable=False)
+    position_type: Mapped[TypeType] = mapped_column(TypeType, nullable=False)
 
 
 
@@ -189,7 +206,7 @@ class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMa
     __mapper_args__ = {
         'polymorphic_identity': 'ChildMappedDAO',
         'inherit_condition': id == ParentDAO.id,
-        }
+    }
 
 class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.DerivedEntity]):
     __tablename__ = 'DerivedEntityDAO'
@@ -205,7 +222,7 @@ class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.Deriv
     __mapper_args__ = {
         'polymorphic_identity': 'DerivedEntityDAO',
         'inherit_condition': id == EntityDAO.id,
-        }
+    }
 
 class TorsoDAO(KinematicChainDAO, DataAccessObject[classes.example_classes.Torso]):
     __tablename__ = 'TorsoDAO'
@@ -221,7 +238,7 @@ class TorsoDAO(KinematicChainDAO, DataAccessObject[classes.example_classes.Torso
     __mapper_args__ = {
         'polymorphic_identity': 'TorsoDAO',
         'inherit_condition': id == KinematicChainDAO.id,
-        }
+    }
 
 class Position4DDAO(PositionDAO, DataAccessObject[classes.example_classes.Position4D]):
     __tablename__ = 'Position4DDAO'
@@ -237,5 +254,5 @@ class Position4DDAO(PositionDAO, DataAccessObject[classes.example_classes.Positi
     __mapper_args__ = {
         'polymorphic_identity': 'Position4DDAO',
         'inherit_condition': id == PositionDAO.id,
-        }
+    }
 

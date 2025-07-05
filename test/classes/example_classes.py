@@ -93,7 +93,6 @@ class Cup(PhysicalObject):
 class Bowl(PhysicalObject):
     pass
 
-
 # @dataclass
 # class MultipleInheritance(Position, Orientation):
 #    pass
@@ -102,7 +101,6 @@ class Bowl(PhysicalObject):
 @dataclass
 class OriginalSimulatedObject:
     concept: PhysicalObject
-    pose: Pose
     placeholder: float = field(default=0)
 
 

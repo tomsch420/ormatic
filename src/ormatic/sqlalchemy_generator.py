@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 import os
 from typing import TextIO, Dict, Any, List, Type, Optional, TYPE_CHECKING
@@ -67,7 +68,7 @@ class SQLAlchemyGenerator:
 
         # Prepare class imports
         module_imports = set()
-        for clazz in self.ormatic.class_dict.keys():
+        for clazz in itertools.chain(self.ormatic.class_dict.keys(), self.ormatic.type_mappings.keys(), self.ormatic.type_mappings.values()):
             module_imports |= {clazz.__module__}
 
         # Render the template
@@ -75,6 +76,7 @@ class SQLAlchemyGenerator:
             wrapped_tables=self.ormatic.wrapped_tables,
             module_imports=module_imports,
             extra_imports=self.ormatic.extra_imports,
+            type_annotation_map=self.ormatic.type_annotation_map
         )
 
         # Write the output to the file

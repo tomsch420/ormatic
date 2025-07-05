@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+
 from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import cached_property, lru_cache
@@ -8,6 +9,7 @@ from typing import Any, Optional, Tuple, Set
 from typing import TextIO
 
 import rustworkx as rx
+from sqlalchemy import TypeDecorator
 from sqlalchemy.orm import relationship
 from typing_extensions import List, Type, Dict
 
@@ -40,17 +42,52 @@ class ORMatic:
     """
 
     extra_imports: Dict[str, Set[str]]
+    """
+    A dict that maps modules to classes that should be imported via from module import class.
+    The key is the module, the value is the set of classes that are needed
+    """
+
+    type_mappings: Dict[Type, TypeDecorator]
+    """
+    A dict that maps classes to custom types that should be used to save the classes.
+    They keys of the type mappings must be disjoint with the classes given..
+    """
+
+    type_annotation_map: Dict[str, str]
+    """
+    The string version of type mappings that is used in jinja.
+    """
+
 
     def __init__(self, classes: List[Type],
-                 type_mappings: Dict[Type, Any] = None):
+                 type_mappings: Dict[Type, TypeDecorator] = None):
         """
         :param classes: The list of classes to be mapped.
-        :param mapper_registry: The SQLAlchemy mapper registry. This is needed for the relationship configuration.
+        :param type_mappings: A dict that maps classes to custom types that should be used instead of the class.
         """
+
+        if type_mappings is None:
+            self.type_mappings = dict()
+        else:
+            intersection_of_classes_and_types = set(classes) & set(type_mappings.keys())
+            if len(intersection_of_classes_and_types) > 0:
+                raise ValueError(f"The type mappings given are not disjoint with the classes given."
+                                 f"The intersection is {intersection_of_classes_and_types}")
+            self.type_mappings = type_mappings
+        self.create_type_annotations_map()
         self.class_dict = {cls: WrappedTable(clazz=cls, ormatic=self) for cls in classes}
+
+
         self.make_class_dependency_graph()
         self.extra_imports = defaultdict(set)
         self.make_all_tables()
+
+    def create_type_annotations_map(self):
+        self.type_annotation_map = {
+            "Type": "TypeType"
+        }
+        for clazz, custom_type in self.type_mappings.items():
+            self.type_annotation_map[f"{clazz.__module__}.{clazz.__name__}"] = f"{custom_type.__module__}.{custom_type.__name__}"
 
     def make_class_dependency_graph(self):
         """
@@ -262,6 +299,10 @@ class WrappedTable:
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(field_info)
 
+        elif not field_info.container and field_info.type in self.ormatic.type_mappings:
+            logger.info(f"Parsing as custom type {self.ormatic.type_mappings[field_info.type]}.")
+            self.create_custom_type(field_info)
+
         elif field_info.container:
             logger.info(f"Parsing as one to many relationship.")
             if field_info.is_container_of_builtin:
@@ -278,7 +319,7 @@ class WrappedTable:
 
     def create_type_type_column(self, field_info: FieldInfo):
         column_name = field_info.name
-        column_type = f"Mapped[str]" if not field_info.optional else f"Mapped[Optional[TypeType]]"
+        column_type = f"Mapped[TypeType]" if not field_info.optional else f"Mapped[Optional[TypeType]]"
         column_constructor = f"mapped_column(TypeType, nullable={field_info.optional})"
         self.custom_columns.append((column_name, column_type, column_constructor))
 
@@ -317,6 +358,8 @@ class WrappedTable:
         column_constructor = f"mapped_column(JSON, nullable={field_info.optional})"
         self.custom_columns.append((column_name, column_type, column_constructor))
 
+    def create_custom_type(self, field_info: FieldInfo):
+        ...
 
 
     @property

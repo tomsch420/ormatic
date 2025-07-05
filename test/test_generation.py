@@ -9,6 +9,7 @@ from sqlalchemy.orm import registry, Session, clear_mappers
 import ormatic
 from classes import example_classes
 from classes.example_classes import *
+from ormatic.custom_types import TypeType
 from ormatic.ormatic import ORMatic
 from ormatic.utils import classes_of_module, recursive_subclasses
 
@@ -30,10 +31,11 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         all_classes -= set(recursive_subclasses(Enum))
         all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl, Torso}
         all_classes = {Position, Position4D, Atom, Orientation, Pose, Positions, DoublePositionAggregator,
-                       PositionTypeWrapper, Parent, ChildMapped, Node, Entity, DerivedEntity, KinematicChain, Torso}
+                       PositionTypeWrapper, Parent, ChildMapped, Node, Entity, DerivedEntity, KinematicChain, Torso,
+                       OriginalSimulatedObject}
 
-        cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)))
-        # cls.ormatic_instance.make_all_tables()
+        cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)),
+                                       {PhysicalObject: TypeType,})
 
         # Generate SQLAlchemy declarative mappings
         with open(os.path.join(os.path.dirname(__file__), 'classes', 'sqlalchemy_interface.py'), 'w') as f:
