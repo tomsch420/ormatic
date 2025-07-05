@@ -7,7 +7,7 @@ from functools import lru_cache
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import Column
-from sqlalchemy.orm import MANYTOONE, DeclarativeBase, declared_attr
+from sqlalchemy.orm import MANYTOONE, DeclarativeBase, declared_attr, ONETOMANY
 from sqlalchemy.sql.schema import Table
 from typing_extensions import Type, get_args, Dict, Any, TypeVar, Generic
 
@@ -100,8 +100,9 @@ class DataAccessObject(Generic[T]):
             if is_data_column(column):
                 setattr(dao_instance, column.name, getattr(obj, column.name))
 
-        # update relationships
+
         for relationship in mapper.relationships:
+            # update one to one like relationships
             if relationship.direction == MANYTOONE:
                 try:
                     value_in_obj = getattr(obj, relationship.key)
@@ -111,7 +112,18 @@ class DataAccessObject(Generic[T]):
                         dao_of_value = get_dao_class(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
                     setattr(dao_instance, relationship.key, dao_of_value)
                 except AttributeError as e:
-                    logger.info(f"Skipping relationship {relationship.key} because {e} ")
+                    logger.warning(f"Skipping relationship {relationship.key} because {e} ")
+
+            # update one to many relationships (list of other objects)
+            elif relationship.direction == ONETOMANY:
+                result = []
+                try:
+                    value_in_obj = getattr(obj, relationship.key)
+                    for v in value_in_obj:
+                        result.append(get_dao_class(type(v)).to_dao(v, memo=memo))
+                except AttributeError as e:
+                    logger.warning(f"Skipping relationship {relationship.key} because {e} ")
+                setattr(dao_instance, relationship.key, result)
 
         return dao_instance
 
@@ -167,10 +179,6 @@ class DataAccessObject(Generic[T]):
                     # Build the string.
         inner = ", ".join(f"{k}={v!r}" for k, v in attr_items)
         return f"{cls.__name__}({inner})"
-
-    # @declared_attr
-    # def __tablename__(cls) -> str:
-    #     return cls.__name__
 
 
 @lru_cache(maxsize=None)

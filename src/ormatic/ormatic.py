@@ -8,9 +8,9 @@ from typing import Any, Optional, Tuple, Set
 from typing import TextIO
 
 import rustworkx as rx
+from sqlalchemy.orm import relationship
 from typing_extensions import List, Type, Dict
 
-from . import field_info
 from .custom_types import TypeType
 from .field_info import FieldInfo, RelationshipInfo
 from .sqlalchemy_generator import SQLAlchemyGenerator
@@ -129,17 +129,27 @@ class WrappedTable:
     The dataclass that this WrappedTable wraps.
     """
 
-    builtin_columns: List = field(default_factory=list)
+    builtin_columns: List[Tuple[str, str]] = field(default_factory=list)
     """
     List of columns that can be directly mapped using builtin types
     """
 
-    foreign_keys: List = field(default_factory=list)
+    custom_columns: List[Tuple[str, str, str]] = field(default_factory=list)
+    """
+    List for custom columns that need to by fully qualified
+    """
+
+    foreign_keys: List[Tuple[str, str, str]] = field(default_factory=list)
     """
     List of columns that represent foreign keys
     """
 
-    relationships: List = field(default_factory=list)
+    relationships: List[Tuple[str, str, str]] = field(default_factory=list)
+    """
+    List of relationships that should be added to the table.
+    """
+
+    mapper_args: Dict[str, str] = field(default_factory=dict)
 
     primary_key_name: str = "id"
     """
@@ -170,6 +180,19 @@ class WrappedTable:
 
         return f"mapped_column({column_type}, primary_key=True)"
 
+    @property
+    def child_tables(self) -> List[WrappedTable]:
+        return self.ormatic.class_dependency_graph.successors(self.index)
+
+    def create_mapper_args(self):
+        if len(self.child_tables) > 0 or self.parent_table is not None:
+            self.mapper_args.update({
+                "polymorphic_on": self.polymorphic_on_name,
+                "polymorphic_identity": f"{self.tablename}"
+            })
+            if self.parent_table is None :
+                self.builtin_columns.append((self.polymorphic_on_name, "Mapped[str]"))
+
     @cached_property
     def full_primary_key_name(self):
         return f"{self.tablename}.{self.primary_key_name}"
@@ -190,32 +213,36 @@ class WrappedTable:
     @lru_cache(maxsize=None)
     def parse_fields(self):
 
+        # collect parent fields
+        if self.parent_table is not None:
+            parent_fields = fields(self.parent_table.clazz)
+        else:
+            parent_fields = []
+
         for f in fields(self.clazz):
 
             logger.info("=" * 80)
             logger.info(f"Processing Field {self.clazz.__name__}.{f.name}: {f.type}.")
 
+            # skip private fields
             if f.name.startswith("_"):
                 logger.info(f"Skipping since the field starts with _.")
                 continue
 
             # skip fields from parent classes
-            if self.parent_table is not None:
-                if f in fields(self.parent_table.clazz):
-                    logger.info(f"Skipping since the field is part of the parent class.")
-                    continue
+            if f in parent_fields:
+                logger.info(f"Skipping since the field is part of the parent class.")
+                continue
 
             field_info = FieldInfo(self.clazz, f)
             self.parse_field(field_info)
 
+        self.create_mapper_args()
+
     def parse_field(self, field_info: FieldInfo):
         if field_info.is_type_type:
             logger.info(f"Parsing as type.")
-            raise NotImplementedError
-            # type_type = TypeType
-            # column = Column(field_info.name, type_type)
-            # wrapped_table.columns.append(column)
-            # self.custom_types.append(CustomTypeInfo(column, type_type, field_info))
+            self.create_type_type_column(field_info)
 
         elif field_info.is_builtin_class or field_info.is_enum or field_info.is_datetime:
             logger.info(f"Parsing as builtin type.")
@@ -226,11 +253,12 @@ class WrappedTable:
             logger.info(f"Parsing as one to one relationship.")
             self.create_one_to_one_relationship(field_info)
 
-        elif field_info.type in self.ormatic.class_dict:
-            logger.info(f"Parsing as custom type mapping.")
-
         elif field_info.container:
-            ...
+            logger.info(f"Parsing as one to many relationship.")
+            if field_info.is_container_of_builtin:
+                self.create_container_of_builtins(field_info)
+            else:
+                self.create_one_to_many_relationship(field_info)
         else:
             logger.info("Skipping due to not handled type.")
 
@@ -239,15 +267,47 @@ class WrappedTable:
             self.ormatic.extra_imports[field_info.type.__module__] |= {field_info.type.__name__}
         self.builtin_columns.append((field_info.name, f"Mapped[{field_info.field.type}]"))
 
+    def create_type_type_column(self, field_info: FieldInfo):
+        column_name = field_info.name
+        column_type = f"Mapped[str]" if not field_info.optional else f"Mapped[Optional[TypeType]]"
+        column_constructor = f"mapped_column(TypeType, nullable={field_info.optional})"
+        self.custom_columns.append((column_name, column_type, column_constructor))
+
     def create_one_to_one_relationship(self, field_info: FieldInfo):
         # create foreign key
-        fk_name = f"{field_info.name}_{self.ormatic.foreign_key_postfix}"
+        fk_name = f"{field_info.name}{self.ormatic.foreign_key_postfix}"
         fk_type = "Mapped[int]"
         fk_column_constructor = f"mapped_column(ForeignKey('{self.ormatic.class_dict[field_info.type].full_primary_key_name}'))"
 
         self.foreign_keys.append((fk_name, fk_type, fk_column_constructor))
-        print(self.foreign_keys)
+
         # create relationship to remote side
+        other_table = self.ormatic.class_dict[field_info.type]
+        rel_name = f"{field_info.name}"
+        rel_type = f"Mapped[{other_table.tablename}]"
+        rel_constructor = f"relationship('{other_table.tablename}', uselist=False, foreign_keys=[{fk_name}])"
+        self.relationships.append((rel_name, rel_type, rel_constructor))
+
+    def create_one_to_many_relationship(self, field_info: FieldInfo):
+        # create a foreign key to this on the remote side
+        other_table = self.ormatic.class_dict[field_info.type]
+        fk_name = f"{self.tablename.lower()}_{field_info.name}{self.ormatic.foreign_key_postfix}"
+        fk_type = "Mapped[Optional[int]]"
+        fk_column_constructor = f"mapped_column(ForeignKey('{self.full_primary_key_name}'))"
+        other_table.foreign_keys.append((fk_name, fk_type, fk_column_constructor))
+
+        # create a relationship with a list to collect the other side
+        rel_name = f"{field_info.name}"
+        rel_type = f"Mapped[List[{other_table.tablename}]]"
+        rel_constructor = f"relationship('{other_table.tablename}', foreign_keys='[{other_table.tablename}.{fk_name}]')"
+        self.relationships.append((rel_name, rel_type, rel_constructor))
+
+    def create_container_of_builtins(self, field_info: FieldInfo):
+        column_name = field_info.name
+        column_type = f"Mapped[{str(field_info.field.type)}]"
+        column_constructor = f"mapped_column(JSON, nullable={field_info.optional})"
+        self.custom_columns.append((column_name, column_type, column_constructor))
+
 
 
     @property

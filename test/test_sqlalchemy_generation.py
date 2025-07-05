@@ -29,9 +29,10 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         all_classes -= set(recursive_subclasses(DataAccessObject))
         all_classes -= set(recursive_subclasses(Enum))
         all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl, Torso}
-        all_classes = {Position, Position4D, Atom, Orientation, Pose}
+        all_classes = {Position, Position4D, Atom, Orientation, Pose, Positions, DoublePositionAggregator,
+                       PositionTypeWrapper, Parent, ChildMapped, Node}
 
-        cls.ormatic_instance = ORMatic(list(all_classes))
+        cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)))
         # cls.ormatic_instance.make_all_tables()
 
         # Generate SQLAlchemy declarative mappings

@@ -7,6 +7,7 @@ from sqlalchemy.orm import registry, Session, configure_mappers
 
 from classes.example_classes import *
 import ormatic.dao
+
 from ormatic.ormatic import ORMatic
 from ormatic.utils import classes_of_module, recursive_subclasses
 from classes.sqlalchemy_interface import *
@@ -75,7 +76,7 @@ class InterfaceTestCase(unittest.TestCase):
 
         # test the content of the database
         # Note: Polymorphic queries don't work correctly yet, so we query directly for Position4DDAO objects
-        queried_p4d = self.session.scalars(select(Position4DDAO)).one()
+        queried_p4d = self.session.scalars(select(PositionDAO)).one()
 
         self.assertEqual(p4d.x, queried_p4d.x)
         self.assertEqual(p4d.y, queried_p4d.y)
@@ -123,6 +124,7 @@ class InterfaceTestCase(unittest.TestCase):
         queried = self.session.scalars(select(PoseDAO)).one()
         self.assertIsNotNone(queried.position)
         self.assertIsNotNone(queried.orientation)
+        self.assertEqual(queried, posedao)
         # queried = queried.from_dao()
         # self.assertEqual(pose, queried)
     #
@@ -171,36 +173,37 @@ class InterfaceTestCase(unittest.TestCase):
     #     # self.assertEqual(derived.name, derived_reconstructed.name)
     #     # self.assertEqual(derived.description, derived_reconstructed.description)
     #
-    # def test_parent_and_child(self):
-    #     parent = Parent("TestParent")
-    #     child_mapped = ChildMapped("ChildMapped", 42)
-    #
-    #     parent_dao = ParentDAO.to_dao(parent)
-    #     child_dao = ChildMappedDAO.to_dao(child_mapped)
-    #
-    #     self.assertEqual(parent.name, parent_dao.name)
-    #     self.assertEqual(child_mapped.name, child_dao.name)
-    #     self.assertEqual(child_mapped.attribute1, child_dao.attribute1)
-    #
-    #     self.session.add(parent_dao)
-    #     self.session.add(child_dao)
-    #     self.session.commit()
-    #
-    #     # test the content of the database
-    #     queried_parent = self.session.scalars(select(ParentDAO)).first()
-    #     queried_child = self.session.scalars(select(ChildMappedDAO)).first()
-    #
-    #     self.assertEqual(parent.name, queried_parent.name)
-    #     self.assertEqual(child_mapped.name, queried_child.name)
-    #     self.assertEqual(child_mapped.attribute1, queried_child.attribute1)
-    #
-    #     # parent_reconstructed = queried_parent.from_dao()
-    #     # child_reconstructed = queried_child.from_dao()
-    #     #
-    #     # self.assertEqual(parent.name, parent_reconstructed.name)
-    #     # self.assertEqual(child_mapped.name, child_reconstructed.name)
-    #     # self.assertEqual(child_mapped.attribute1, child_reconstructed.attribute1)
-    #
+    def test_parent_and_child(self):
+        parent = Parent("TestParent")
+        child_mapped = ChildMapped("ChildMapped", 42)
+        child_not_mapped = ChildNotMapped("a", 2, {})
+
+        parent_dao = ParentDAO.to_dao(parent)
+        child_dao = ChildMappedDAO.to_dao(child_mapped)
+
+        self.assertEqual(parent.name, parent_dao.name)
+        self.assertEqual(child_mapped.name, child_dao.name)
+        self.assertEqual(child_mapped.attribute1, child_dao.attribute1)
+
+        self.session.add(parent_dao)
+        self.session.add(child_dao)
+        self.session.commit()
+
+        # test the content of the database
+        queried_parent = self.session.scalars(select(ParentDAO)).first()
+        queried_child = self.session.scalars(select(ChildMappedDAO)).first()
+
+        self.assertEqual(parent.name, queried_parent.name)
+        self.assertEqual(child_mapped.name, queried_child.name)
+        self.assertEqual(child_mapped.attribute1, queried_child.attribute1)
+
+        # parent_reconstructed = queried_parent.from_dao()
+        # child_reconstructed = queried_child.from_dao()
+        #
+        # self.assertEqual(parent.name, parent_reconstructed.name)
+        # self.assertEqual(child_mapped.name, child_reconstructed.name)
+        # self.assertEqual(child_mapped.attribute1, child_reconstructed.attribute1)
+
     # def test_node(self):
     #
     #     # TODO somehow make the to_dao method also take the related node n3 here into account
@@ -216,33 +219,49 @@ class InterfaceTestCase(unittest.TestCase):
     #     results = self.session.scalars(select(NodeDAO)).all()
     #     self.assertEqual(len(results), 2)
     #
-    # def test_position_type_wrapper(self):
-    #     wrapper = PositionTypeWrapper(Position)
-    #     dao = PositionTypeWrapperDAO.to_dao(wrapper)
-    #     self.assertEqual(dao.position_type, wrapper.position_type)
-    #     self.session.add(dao)
-    #     self.session.commit()
+    def test_position_type_wrapper(self):
+        wrapper = PositionTypeWrapper(Position)
+        dao = PositionTypeWrapperDAO.to_dao(wrapper)
+        self.assertEqual(dao.position_type, wrapper.position_type)
+        self.session.add(dao)
+        self.session.commit()
+
+        result = self.session.scalars(select(PositionTypeWrapperDAO)).one()
+        self.assertEqual(result, dao)
     #
-    #     result = self.session.scalars(select(PositionTypeWrapperDAO)).one()
-    #     self.assertEqual(result, dao)
-    #
-    # def test_positions(self):
-    #     p1 = Position(1, 2, 3)
-    #     p2 = Position(2, 3, 4)
-    #     positions = Positions([p1, p2], ["a", "b", "c"])
-    #     dao = PositionsDAO.to_dao(positions)
-    #
-    #     self.session.add(dao)
-    #     self.session.commit()
-    #
-    #     result = self.session.scalars(select(PositionsDAO)).one()
-    #     self.assertEqual(result.some_strings, positions.some_strings)
-    #     self.assertEqual(len(result.positions), 2)
-    #
-    #
-    # def test_double_position_aggregator(self):
-    #     # Skip this test for now due to issues with relationship handling
-    #     self.skipTest("Skipping test due to issues with relationship handling")
+    def test_positions(self):
+        p1 = Position(1, 2, 3)
+        p2 = Position(2, 3, 4)
+        positions = Positions([p1, p2], ["a", "b", "c"])
+        dao = PositionsDAO.to_dao(positions)
+        self.assertEqual(len(dao.positions), 2)
+
+        self.session.add(dao)
+        self.session.commit()
+
+        positions_results = self.session.scalars(select(PositionDAO)).all()
+        self.assertEqual(len(positions_results), 2)
+
+        result = self.session.scalars(select(PositionsDAO)).one()
+        self.assertEqual(result.some_strings, positions.some_strings)
+
+        self.assertEqual(len(result.positions), 2)
+
+
+    def test_double_position_aggregator(self):
+        p1, p2, p3 = Position(1, 2, 3), Position(2, 3, 4), Position(3, 4, 5)
+        dpa = DoublePositionAggregator([p1, p2], [p1, p3])
+        dpa_dao = DoublePositionAggregatorDAO.to_dao(dpa)
+
+        self.session.add(dpa_dao)
+        self.session.commit()
+
+        queried_positions = self.session.scalars(select(PositionDAO)).all()
+        self.assertEqual(len(queried_positions), 3)
+
+        queried = self.session.scalars(select(DoublePositionAggregatorDAO)).one()
+        self.assertEqual(queried, dpa_dao)
+
     #
     # def test_kinematic_chain_and_torso(self):
     #     # Skip this test for now due to issues with relationship handling
