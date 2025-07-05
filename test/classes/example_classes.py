@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Dict
 
@@ -82,7 +83,7 @@ class Atom(NotMappedParent):
     element: Element
     type: int
     charge: float
-
+    timestamp: datetime = field(default_factory=datetime.now)
 
 # check that custom type checks work
 class PhysicalObject:

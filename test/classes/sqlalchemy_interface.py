@@ -4,6 +4,7 @@ from __future__ import annotations
 from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Enum, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing_extensions import Optional, List, Type
+from datetime import datetime
 
 import classes.example_classes
 from classes.example_classes import Element
@@ -26,6 +27,7 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
     element: Mapped[Element]
     type: Mapped[int]
     charge: Mapped[float]
+    timestamp: Mapped[datetime]
 
 
 
