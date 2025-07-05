@@ -108,13 +108,6 @@ class FieldInfo:
     def is_type_type(self) -> bool:
         return self.is_type_field
 
-    @cached_property
-    def column(self) -> Column:
-        if self.is_enum:
-            return Column(self.name, sqlalchemy.Enum(self.type), nullable=self.optional)
-        else:
-            return Column(self.name, sqlalchemy_type(self.type), nullable=self.optional)
-
     @property
     def is_enum(self):
         return issubclass(self.type, enum.Enum)
@@ -124,49 +117,6 @@ class FieldInfo:
         return self.type == datetime
 
 
-@dataclass
-class RelationshipInfo:
-    """
-    Wrapper class for relationships since sqlalchemy loses information in its process.
-    """
-    foreign_key_name: str
-    relationship: _RelationshipDeclared
-    field_info: FieldInfo
-
-    @property
-    def is_one_to_one(self) -> bool:
-        return self.field_info.container is None
-
-
-@dataclass
-class CustomTypeInfo:
-    """
-    Wrapper object to associate custom types with fields.
-    """
-    column: Column
-    custom_type: TypeDecorator
-    field_info: FieldInfo
-
-
-def sqlalchemy_type(t: Type) -> Type[sqlalchemy.types.TypeEngine]:
-    """
-    Convert a Python type to a SQLAlchemy type.
-
-    :param t: A Python type
-    :return: The corresponding SQLAlchemy type
-    """
-    if t == int:
-        return sqlalchemy.Integer
-    elif t == float:
-        return sqlalchemy.Float
-    elif t == str:
-        return sqlalchemy.String(255)
-    elif t == bool:
-        return sqlalchemy.Boolean
-    elif t == datetime:
-        return sqlalchemy.DateTime
-    else:
-        raise ValueError(f"Could not parse type {t}.")
 
 
 def is_container(clazz: Type) -> bool:

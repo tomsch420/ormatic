@@ -11,7 +11,7 @@ from sqlalchemy import Column, ForeignKey, Table
 from sqlalchemy.orm import relationship, registry
 
 from .dao import DataAccessObject
-from .field_info import FieldInfo, RelationshipInfo, CustomTypeInfo
+from .field_info import FieldInfo
 
 if TYPE_CHECKING:
     from .ormatic import ORMatic, WrappedTable

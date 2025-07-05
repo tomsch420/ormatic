@@ -14,7 +14,7 @@ from sqlalchemy.orm import relationship
 from typing_extensions import List, Type, Dict
 
 from .custom_types import TypeType
-from .field_info import FieldInfo, RelationshipInfo
+from .field_info import FieldInfo
 from .sqlalchemy_generator import SQLAlchemyGenerator
 
 logger = logging.getLogger(__name__)
