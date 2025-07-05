@@ -267,13 +267,28 @@ class InterfaceTestCase(unittest.TestCase):
         k2 = KinematicChain("b")
         torso = Torso("t", [k1 ,k2])
         torso_dao = TorsoDAO.to_dao(torso)
+
+        self.session.add(torso_dao)
+        self.session.commit()
+
+        queried_torso = self.session.scalars(select(TorsoDAO)).one()
+        self.assertEqual(queried_torso, torso_dao)
     #
     # def test_original_simulated_object_and_annotation(self):
     #     # Skip this test for now due to issues with relationship handling
     #     self.skipTest("Skipping test due to issues with relationship handling")
 
     def test_custom_types(self):
-        ...
+        ogs = OriginalSimulatedObject(Bowl(), 1)
+        ogs_dao = OriginalSimulatedObjectDAO.to_dao(ogs)
+        self.assertEqual(ogs.concept, ogs_dao.concept)
+
+        self.session.add(ogs_dao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(OriginalSimulatedObjectDAO)).one()
+        self.assertEqual(ogs_dao, queried)
+        self.assertIsInstance(queried.concept, Bowl)
 
 
 if __name__ == '__main__':

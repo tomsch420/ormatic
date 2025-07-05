@@ -47,7 +47,7 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ tab
     {{ name }}: {{ type }} = {{ constructor }}
     {% endfor %}
 
-    {% if table.mapper_args %}#}
+    {% if table.mapper_args %}
     __mapper_args__ = {
     {% for key, value in table.mapper_args.items() %}
         {{ key }}: {{ value }},

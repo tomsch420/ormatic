@@ -5,7 +5,6 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, Date
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing_extensions import Optional, List, Type
 
-import ormatic.custom_types
 import classes.example_classes
 from classes.example_classes import Element
 
@@ -15,7 +14,7 @@ from ormatic.custom_types import TypeType
 class Base(DeclarativeBase):
     type_mappings = {
         Type: TypeType,
-        classes.example_classes.PhysicalObject: ormatic.custom_types.TypeType,
+        classes.example_classes.PhysicalObject: classes.example_classes.ConceptType,
     }
 
 
@@ -43,7 +42,6 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
 
 
 
-#}
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'ParentDAO',
@@ -60,7 +58,6 @@ class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
 
 
 
-#}
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'EntityDAO',
@@ -90,7 +87,6 @@ class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.Kinematic
     torsodao_kinematic_chains_id: Mapped[Optional[int]] = mapped_column(ForeignKey('TorsoDAO.id'))
 
 
-#}
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'KinematicChainDAO',
@@ -129,6 +125,7 @@ class OriginalSimulatedObjectDAO(Base, DataAccessObject[classes.example_classes.
 
     placeholder: Mapped[float]
 
+    concept: Mapped[classes.example_classes.ConceptType] = mapped_column(classes.example_classes.ConceptType, nullable=False)
 
 
 
@@ -163,7 +160,6 @@ class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
     positionsdao_positions_id: Mapped[Optional[int]] = mapped_column(ForeignKey('PositionsDAO.id'))
 
 
-#}
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'PositionDAO',
@@ -202,7 +198,6 @@ class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMa
 
 
 
-#}
     __mapper_args__ = {
         'polymorphic_identity': 'ChildMappedDAO',
         'inherit_condition': id == ParentDAO.id,
@@ -218,7 +213,6 @@ class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.Deriv
 
 
 
-#}
     __mapper_args__ = {
         'polymorphic_identity': 'DerivedEntityDAO',
         'inherit_condition': id == EntityDAO.id,
@@ -234,7 +228,6 @@ class TorsoDAO(KinematicChainDAO, DataAccessObject[classes.example_classes.Torso
 
     kinematic_chains: Mapped[List[KinematicChainDAO]] = relationship('KinematicChainDAO', foreign_keys='[KinematicChainDAO.torsodao_kinematic_chains_id]')
 
-#}
     __mapper_args__ = {
         'polymorphic_identity': 'TorsoDAO',
         'inherit_condition': id == KinematicChainDAO.id,
@@ -250,7 +243,6 @@ class Position4DDAO(PositionDAO, DataAccessObject[classes.example_classes.Positi
 
 
 
-#}
     __mapper_args__ = {
         'polymorphic_identity': 'Position4DDAO',
         'inherit_condition': id == PositionDAO.id,

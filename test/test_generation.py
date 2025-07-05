@@ -35,7 +35,7 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
                        OriginalSimulatedObject}
 
         cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)),
-                                       {PhysicalObject: TypeType,})
+                                       {PhysicalObject: ConceptType,})
 
         # Generate SQLAlchemy declarative mappings
         with open(os.path.join(os.path.dirname(__file__), 'classes', 'sqlalchemy_interface.py'), 'w') as f:

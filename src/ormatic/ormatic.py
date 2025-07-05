@@ -359,7 +359,14 @@ class WrappedTable:
         self.custom_columns.append((column_name, column_type, column_constructor))
 
     def create_custom_type(self, field_info: FieldInfo):
-        ...
+        custom_type = self.ormatic.type_mappings[field_info.type]
+        column_name = field_info.name
+        column_type = f"Mapped[{custom_type.__module__}.{custom_type.__name__}]" if not field_info.optional \
+            else f"Mapped[Optional[{custom_type.__module__}.{custom_type.__name__}]]"
+
+        constructor = f"mapped_column({custom_type.__module__}.{custom_type.__name__}, nullable={field_info.optional})"
+
+        self.custom_columns.append((column_name, column_type, constructor))
 
 
     @property
