@@ -72,10 +72,12 @@ class Position4D(Position):
 class Node:
     parent: Optional[Node] = None
 
+class NotMappedParent:
+    ...
 
 # check that enum references work
 @dataclass
-class Atom:
+class Atom(NotMappedParent):
     element: Element
     type: int
     charge: float

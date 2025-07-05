@@ -97,7 +97,7 @@ class ORMatic:
         for clazz, wrapped_table in self.class_dict.items():
             self._add_wrapped_table(wrapped_table)
 
-            bases = [base for base in clazz.__bases__ if base.__module__ not in ["builtins"]]
+            bases = [base for base in clazz.__bases__ if base.__module__ not in ["builtins"]  and base in self.class_dict]
 
             if len(bases) == 0:
                 continue
