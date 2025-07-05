@@ -100,10 +100,10 @@ class DataAccessObject(Generic[T]):
             if is_data_column(column):
                 setattr(dao_instance, column.name, getattr(obj, column.name))
 
-
         for relationship in mapper.relationships:
             # update one to one like relationships
-            if relationship.direction == MANYTOONE:
+            if (relationship.direction == MANYTOONE or
+                    (relationship.direction == ONETOMANY and not relationship.uselist)):
                 try:
                     value_in_obj = getattr(obj, relationship.key)
                     if value_in_obj is None:

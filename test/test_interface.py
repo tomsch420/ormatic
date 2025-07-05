@@ -204,21 +204,21 @@ class InterfaceTestCase(unittest.TestCase):
         # self.assertEqual(child_mapped.name, child_reconstructed.name)
         # self.assertEqual(child_mapped.attribute1, child_reconstructed.attribute1)
 
-    # def test_node(self):
-    #
-    #     # TODO somehow make the to_dao method also take the related node n3 here into account
-    #     n1 = Node()
-    #     n2 = Node(parent=n1)
-    #     n3 = Node(parent=n1)
-    #
-    #     n2dao = NodeDAO.to_dao(n2)
-    #
-    #     self.session.add(n2dao)
-    #     self.session.commit()
-    #
-    #     results = self.session.scalars(select(NodeDAO)).all()
-    #     self.assertEqual(len(results), 2)
-    #
+    def test_node(self):
+
+        # TODO somehow make the to_dao method also take the related node n3 here into account
+        n1 = Node()
+        n2 = Node(parent=n1)
+        n3 = Node(parent=n1)
+
+        n2dao = NodeDAO.to_dao(n2)
+
+        self.session.add(n2dao)
+        self.session.commit()
+
+        results = self.session.scalars(select(NodeDAO)).all()
+        self.assertEqual(len(results), 2)
+
     def test_position_type_wrapper(self):
         wrapper = PositionTypeWrapper(Position)
         dao = PositionTypeWrapperDAO.to_dao(wrapper)

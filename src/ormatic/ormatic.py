@@ -276,8 +276,8 @@ class WrappedTable:
     def create_one_to_one_relationship(self, field_info: FieldInfo):
         # create foreign key
         fk_name = f"{field_info.name}{self.ormatic.foreign_key_postfix}"
-        fk_type = "Mapped[int]"
-        fk_column_constructor = f"mapped_column(ForeignKey('{self.ormatic.class_dict[field_info.type].full_primary_key_name}'))"
+        fk_type = f"Mapped[Optional[int]]" if field_info.optional else "Mapped[int]"
+        fk_column_constructor = f"mapped_column(ForeignKey('{self.ormatic.class_dict[field_info.type].full_primary_key_name}'), nullable={field_info.optional})"
 
         self.foreign_keys.append((fk_name, fk_type, fk_column_constructor))
 

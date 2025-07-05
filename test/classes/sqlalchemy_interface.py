@@ -59,7 +59,7 @@ class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
-    parent_id: Mapped[int] = mapped_column(ForeignKey('NodeDAO.id'))
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'), nullable=True)
 
     parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id])
 
@@ -87,8 +87,8 @@ class PoseDAO(Base, DataAccessObject[classes.example_classes.Pose]):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
-    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'))
-    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'))
+    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), nullable=False)
+    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'), nullable=False)
 
     position: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[position_id])
     orientation: Mapped[OrientationDAO] = relationship('OrientationDAO', uselist=False, foreign_keys=[orientation_id])
