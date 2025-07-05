@@ -3,15 +3,14 @@ import os
 import sys
 import unittest
 
-from sqlalchemy import create_engine, Column
-from sqlalchemy.orm import registry, Session, clear_mappers
+from sqlalchemy.orm import registry, Session
 
 import ormatic
 from classes import example_classes
 from classes.example_classes import *
-from ormatic.custom_types import TypeType
 from ormatic.ormatic import ORMatic
 from ormatic.utils import classes_of_module, recursive_subclasses
+
 
 class SQLAlchemyGenerationTestCase(unittest.TestCase):
     session: Session
@@ -25,7 +24,6 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         ormatic.ormatic.logger.addHandler(handler)
         ormatic.ormatic.logger.setLevel(logging.DEBUG)
 
-
         all_classes = set(classes_of_module(example_classes))
         all_classes -= set(recursive_subclasses(DataAccessObject))
         all_classes -= set(recursive_subclasses(Enum))
@@ -35,7 +33,7 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
                        OriginalSimulatedObject}
 
         cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)),
-                                       {PhysicalObject: ConceptType,})
+                                       {PhysicalObject: ConceptType, })
 
         # Generate SQLAlchemy declarative mappings
         with open(os.path.join(os.path.dirname(__file__), 'classes', 'sqlalchemy_interface.py'), 'w') as f:

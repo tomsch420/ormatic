@@ -8,12 +8,9 @@ import sys
 import typing
 from dataclasses import dataclass, Field
 from datetime import datetime
-from functools import cached_property, lru_cache
+from functools import lru_cache
 from types import NoneType
 
-import sqlalchemy
-from sqlalchemy import Column, TypeDecorator
-from sqlalchemy.orm.relationships import _RelationshipDeclared
 from typing_extensions import Type, get_origin, Optional, get_type_hints
 
 
@@ -117,8 +114,6 @@ class FieldInfo:
         return self.type == datetime
 
 
-
-
 def is_container(clazz: Type) -> bool:
     """
     Check if a class is an iterable.
@@ -149,7 +144,6 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
         if inspect.isclass(obj) and obj.__name__ == target_class_name:
             found_classes.append(obj)
 
-
     # Search 2: In all loaded modules (via sys.modules)
     for module_name, module in sys.modules.items():
         if module is None or not hasattr(module, '__dict__'):
@@ -171,6 +165,7 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
         resolved_class = found_classes[0]
 
     return resolved_class
+
 
 @lru_cache(maxsize=None)
 def warn_multiple_classes(target_class_name, found_classes):

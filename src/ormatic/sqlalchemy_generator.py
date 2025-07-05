@@ -3,18 +3,12 @@ from __future__ import annotations
 import itertools
 import logging
 import os
-from typing import TextIO, Dict, Any, List, Type, Optional, TYPE_CHECKING
+from typing import TextIO, TYPE_CHECKING
 
 import jinja2
-import sqlalchemy
-from sqlalchemy import Column, ForeignKey, Table
-from sqlalchemy.orm import relationship, registry
-
-from .dao import DataAccessObject
-from .field_info import FieldInfo
 
 if TYPE_CHECKING:
-    from .ormatic import ORMatic, WrappedTable
+    from .ormatic import ORMatic
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +39,9 @@ class SQLAlchemyGenerator:
         self.ormatic = ormatic
 
         # Set up Jinja2 environment
-        template_dir = os.path.join(os.path.dirname(__file__), "..", "..",'templates')
-        self.env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(template_dir),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
+        template_dir = os.path.join(os.path.dirname(__file__), "..", "..", 'templates')
+        self.env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir), trim_blocks=True,
+            lstrip_blocks=True)
 
     def to_sqlalchemy_file(self, file: TextIO):
         """
@@ -63,17 +54,13 @@ class SQLAlchemyGenerator:
 
         # Prepare class imports
         module_imports = set()
-        for clazz in itertools.chain(self.ormatic.class_dict.keys(), self.ormatic.type_mappings.keys(), self.ormatic.type_mappings.values()):
+        for clazz in itertools.chain(self.ormatic.class_dict.keys(), self.ormatic.type_mappings.keys(),
+                                     self.ormatic.type_mappings.values()):
             module_imports |= {clazz.__module__}
 
         # Render the template
-        output = template.render(
-            wrapped_tables=self.ormatic.wrapped_tables,
-            module_imports=module_imports,
-            extra_imports=self.ormatic.extra_imports,
-            type_annotation_map=self.ormatic.type_annotation_map
-        )
+        output = template.render(wrapped_tables=self.ormatic.wrapped_tables, module_imports=module_imports,
+            extra_imports=self.ormatic.extra_imports, type_annotation_map=self.ormatic.type_annotation_map)
 
         # Write the output to the file
         file.write(output)
-
