@@ -144,14 +144,14 @@ class InterfaceTestCase(unittest.TestCase):
 
 
     def test_entity_and_derived(self):
-        entity = Entity("TestEntity")
+        entity = CustomEntity("TestEntity")
         derived = DerivedEntity("DerivedEntity", "Test Description")
 
-        entity_dao = EntityDAO.to_dao(entity)
+        entity_dao = CustomEntityDAO.to_dao(entity)
         derived_dao = DerivedEntityDAO.to_dao(derived)
 
-        self.assertEqual(entity.name, entity_dao.name)
-        self.assertEqual(derived.name, derived_dao.name)
+        self.assertEqual(entity.overwritten_name, entity_dao.overwritten_name)
+        self.assertEqual(derived.name, derived_dao.overwritten_name)
         self.assertEqual(derived.description, derived_dao.description)
 
         self.session.add(entity_dao)
@@ -159,11 +159,11 @@ class InterfaceTestCase(unittest.TestCase):
         self.session.commit()
 
         # test the content of the database
-        queried_entity = self.session.scalars(select(EntityDAO)).first()
+        queried_entity = self.session.scalars(select(CustomEntityDAO)).first()
         queried_derived = self.session.scalars(select(DerivedEntityDAO)).first()
 
-        self.assertEqual(entity.name, queried_entity.name)
-        self.assertEqual(derived.name, queried_derived.name)
+        self.assertEqual(entity.overwritten_name, queried_entity.overwritten_name)
+        self.assertEqual(derived.name, queried_derived.overwritten_name)
         self.assertEqual(derived.description, queried_derived.description)
 
         # entity_reconstructed = queried_entity.from_dao()
@@ -190,12 +190,15 @@ class InterfaceTestCase(unittest.TestCase):
         self.session.commit()
 
         # test the content of the database
-        queried_parent = self.session.scalars(select(ParentDAO)).first()
-        queried_child = self.session.scalars(select(ChildMappedDAO)).first()
+        queried_parent = self.session.scalars(select(ParentDAO)).all()
+        queried_child = self.session.scalars(select(ChildMappedDAO)).all()
 
-        self.assertEqual(parent.name, queried_parent.name)
-        self.assertEqual(child_mapped.name, queried_child.name)
-        self.assertEqual(child_mapped.attribute1, queried_child.attribute1)
+        self.assertTrue(child_dao in queried_parent)
+        self.assertTrue(queried_child[0] in queried_parent)
+
+        self.assertEqual(parent.name, queried_parent[0].name)
+        self.assertEqual(child_mapped.name, queried_child[0].name)
+        self.assertEqual(child_mapped.attribute1, queried_child[0].attribute1)
 
         # parent_reconstructed = queried_parent.from_dao()
         # child_reconstructed = queried_child.from_dao()
@@ -260,6 +263,7 @@ class InterfaceTestCase(unittest.TestCase):
 
         queried = self.session.scalars(select(DoublePositionAggregatorDAO)).one()
         self.assertEqual(queried, dpa_dao)
+        self.assertTrue(queried.positions1[0] in queried_positions)
 
 
     def test_kinematic_chain_and_torso(self):
@@ -289,6 +293,35 @@ class InterfaceTestCase(unittest.TestCase):
         queried = self.session.scalars(select(OriginalSimulatedObjectDAO)).one()
         self.assertEqual(ogs_dao, queried)
         self.assertIsInstance(queried.concept, Bowl)
+
+    # To dao ueberschreiben wenn overwritten attributes
+    # fields
+    def test_inheriting_from_explicit_mapping(self):
+        entity: DerivedEntity = DerivedEntity(name="TestEntity")
+
+        # print(CustomEntity.to_dao(entity))
+        # print(DerivedEntity.__bases__)
+
+        # subclass of an alternative mapping:
+        # 1. create superclass DAO
+        # 2. figure out what columns are from the superclass
+        # 3. read the columns from the super class
+        # 4. fill the subclass DAO with the subclass columns
+
+        # entity association, hat entity vom typ
+
+        entity_dao = DerivedEntityDAO.to_dao(entity)
+        self.assertIsInstance(entity_dao, DerivedEntityDAO)
+        self.session.add(entity_dao)
+        self.session.commit()
+
+
+        queried_entities_og = self.session.scalars(select(CustomEntityDAO)).all()
+        queried_entity = self.session.scalars(select(DerivedEntityDAO)).one()
+        self.assertTrue(queried_entity.description is not None)
+        self.assertTrue(queried_entity.overwritten_name is not None)
+        self.assertTrue(queried_entity in queried_entities_og)
+
 
 
 if __name__ == '__main__':

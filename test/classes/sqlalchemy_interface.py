@@ -49,12 +49,12 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
         'polymorphic_identity': 'ParentDAO',
     }
 
-class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
-    __tablename__ = 'EntityDAO'
+class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntity]):
+    __tablename__ = 'CustomEntityDAO'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    name: Mapped[str]
+    overwritten_name: Mapped[str]
     polymorphic_type: Mapped[str]
 
 
@@ -62,7 +62,7 @@ class EntityDAO(Base, DataAccessObject[classes.example_classes.Entity]):
 
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
-        'polymorphic_identity': 'EntityDAO',
+        'polymorphic_identity': 'CustomEntityDAO',
     }
 
 class DoublePositionAggregatorDAO(Base, DataAccessObject[classes.example_classes.DoublePositionAggregator]):
@@ -205,10 +205,10 @@ class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMa
         'inherit_condition': id == ParentDAO.id,
     }
 
-class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.DerivedEntity]):
+class DerivedEntityDAO(CustomEntityDAO, DataAccessObject[classes.example_classes.DerivedEntity]):
     __tablename__ = 'DerivedEntityDAO'
 
-    id: Mapped[int] = mapped_column(ForeignKey(EntityDAO.id), primary_key=True)
+    id: Mapped[int] = mapped_column(ForeignKey(CustomEntityDAO.id), primary_key=True)
 
     description: Mapped[str]
 
@@ -217,7 +217,7 @@ class DerivedEntityDAO(EntityDAO, DataAccessObject[classes.example_classes.Deriv
 
     __mapper_args__ = {
         'polymorphic_identity': 'DerivedEntityDAO',
-        'inherit_condition': id == EntityDAO.id,
+        'inherit_condition': id == CustomEntityDAO.id,
     }
 
 class TorsoDAO(KinematicChainDAO, DataAccessObject[classes.example_classes.Torso]):

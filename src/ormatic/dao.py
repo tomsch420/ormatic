@@ -28,15 +28,7 @@ class NoGenericError(TypeError):
 def is_data_column(column: Column):
     return not column.primary_key and len(column.foreign_keys) == 0 and column.name != "polymorphic_type"
 
-
-class DataAccessObject(Generic[T]):
-    """
-    This class defines the interfaces the DAO classes should implement.
-
-    ORMatic generates classes from your python code that are derived from the provided classes in your package.
-    The generated classes can be instantiated from objects of the given classes and vice versa.
-    This class describes the necessary functionality.
-    """
+class HasGeneric(Generic[T]):
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -67,6 +59,16 @@ class DataAccessObject(Generic[T]):
         except (AttributeError, IndexError):
             raise NoGenericError(cls)
 
+class DataAccessObject(HasGeneric[T]):
+    """
+    This class defines the interfaces the DAO classes should implement.
+
+    ORMatic generates classes from your python code that are derived from the provided classes in your package.
+    The generated classes can be instantiated from objects of the given classes and vice versa.
+    This class describes the necessary functionality.
+    """
+
+
     @classmethod
     def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
         """
@@ -87,15 +89,26 @@ class DataAccessObject(Generic[T]):
         if id(obj) in memo:
             return memo[id(obj)]
 
+        # TODO if the object passed in has an alternative mapping, construct the alternative mapping first
+        # if isinstance(obj, AlternativeMapping):
+        #     alternative_mapping_cls = get_alternative_mapping(type(obj))
+        #     obj = alternative_mapping_cls.from_dao(obj, memo=memo)
+        #
         # Create a new instance of the DAO class
         dao_instance = cls()
         memo[id(obj)] = dao_instance
 
+        # Fuellt Superklassen Spalten auf, Mapper-columns - self.columns
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(cls)
 
         # set the atomic fields of the dao_instance to the values from `obj`
         for column in mapper.columns:
-            if is_data_column(column):
+            if is_data_column(column) and column.name not in obj.__dict__:
+                for parent in type(dao_instance).__bases__:
+                    if not parent == DataAccessObject and issubclass(parent.original_class(), AlternativeMapping) :
+                        custom_attribute = parent.original_class().to_dao(obj, memo=memo)
+                        setattr(dao_instance, column.name, getattr(custom_attribute, column.name))
+            elif is_data_column(column):
                 setattr(dao_instance, column.name, getattr(obj, column.name))
 
         for relationship in mapper.relationships:
@@ -179,6 +192,20 @@ class DataAccessObject(Generic[T]):
         return f"{cls.__name__}({inner})"
 
 
+class AlternativeMapping(HasGeneric[T]):
+
+    @classmethod
+    def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
+        """
+        Specifies how to build an instance of this class from an instance of the original class.
+        """
+        if memo is None:
+            memo = {}
+        if id(obj) in memo:
+            return memo[id(obj)]
+        else:
+            return obj
+
 @lru_cache(maxsize=None)
 def get_dao_class(cls: Type):
     for dao in recursive_subclasses(DataAccessObject):
@@ -186,3 +213,9 @@ def get_dao_class(cls: Type):
             return dao
     raise ValueError(f"Could not find a DAO for {cls}")
 
+@lru_cache(maxsize=None)
+def get_alternative_mapping(cls: Type):
+    for dao in recursive_subclasses(AlternativeMapping):
+        if dao.original_class() == cls:
+            return dao
+    return None

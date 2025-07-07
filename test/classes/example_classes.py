@@ -4,12 +4,13 @@ import importlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict
+from typing import Dict, Any
 
 from sqlalchemy import types, TypeDecorator
 from typing_extensions import List, Optional, Type
 
-from ormatic.dao import DataAccessObject
+from ormatic.dao import DataAccessObject, AlternativeMapping
+
 
 # check that custom enums works
 class Element(Enum):
@@ -60,13 +61,6 @@ class DoublePositionAggregator:
 @dataclass
 class Position4D(Position):
     w: float
-
-# # check that explicit mappings work
-# @dataclass
-# class PartialPosition(DataAccessObject[Position4D]):
-#     x: float
-#     y: float
-#     z: float
 
 
 # check with tree like classes
@@ -146,6 +140,7 @@ class ChildNotMapped(Parent):
 @dataclass
 class Entity:
     name: str
+    attribute_that_shouldnt_appear_at_all: float = 0
 
 
 # Define a derived class
@@ -153,11 +148,26 @@ class Entity:
 class DerivedEntity(Entity):
     description: str = "Default description"
 
-#
-# # Define an explicit mapping DAO that maps to the base entity class
-# @dataclass
-# class EntityDAO(DataAccessObject[Entity]):
-#     name: str
+@dataclass
+class EntityAssociation:
+    """
+    Class for checking how classes that are explicitly mapped interact with original types.
+    """
+    entity: Entity
+
+# Define an explicit mapping DAO that maps to the base entity class
+@dataclass
+class CustomEntity(AlternativeMapping[Entity]):
+    overwritten_name: str
+
+    @classmethod
+    def to_dao(cls, obj: Entity, memo: Dict[int, Any] = None):
+        if memo is None:
+            memo = {}
+        # if id(obj) in memo:
+        #     x = memo[id(obj)]
+        #     return memo[id(obj)]
+        return cls(overwritten_name=obj.name)
 
 class ConceptType(TypeDecorator):
     """

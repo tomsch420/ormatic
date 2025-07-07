@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from collections import defaultdict
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, Field
 from functools import cached_property, lru_cache
 from typing import Any, Optional, Tuple, Set
 from typing import TextIO
@@ -11,9 +11,12 @@ from typing import TextIO
 import rustworkx as rx
 from sqlalchemy import TypeDecorator
 from sqlalchemy.orm import relationship
-from typing_extensions import List, Type, Dict
+from typing_extensions import List, Type, Dict, get_origin, get_args
 
+from classes.example_classes import DerivedEntity
+from classes.sqlalchemy_interface import ParentDAO
 from .custom_types import TypeType
+from .dao import DataAccessObject, AlternativeMapping
 from .field_info import FieldInfo
 from .sqlalchemy_generator import SQLAlchemyGenerator
 
@@ -75,7 +78,14 @@ class ORMatic:
                                  f"The intersection is {intersection_of_classes_and_types}")
             self.type_mappings = type_mappings
         self.create_type_annotations_map()
-        self.class_dict = {cls: WrappedTable(clazz=cls, ormatic=self) for cls in classes}
+
+        self.class_dict = {}
+        for cls in classes:
+            if issubclass(cls, AlternativeMapping):
+                # if the class is a DAO, we use the original class for the mapping
+                self.class_dict[cls.original_class()] = WrappedTable(clazz=cls, ormatic=self)
+            else:
+                self.class_dict[cls] = WrappedTable(clazz=cls, ormatic=self)
 
 
         self.make_class_dependency_graph()
@@ -93,7 +103,9 @@ class ORMatic:
         """
         Create a direct acyclic graph containing the class hierarchy.
         """
+        # TODO map stuff differently thats already a subclass of DAO
         self.class_dependency_graph = rx.PyDAG()
+
         for clazz, wrapped_table in self.class_dict.items():
             self._add_wrapped_table(wrapped_table)
 
@@ -245,6 +257,7 @@ class WrappedTable:
 
     @cached_property
     def tablename(self):
+        # TODO check if DAO
         result = self.clazz.__name__
         result += "DAO"
         return result
@@ -256,16 +269,33 @@ class WrappedTable:
             return None
         return parents[0]
 
+    @cached_property
+    def fields(self) -> List[Field]:
+        # collect parent fields TODO check the desired fields from parent classes
+
+        skip_fields = []
+
+        if self.parent_table is not None:
+            skip_fields.extend(self.parent_table.fields)
+
+
+        result = [field for field in fields(self.clazz) if field not in skip_fields]
+
+        if self.parent_table is not None:
+            if issubclass(self.parent_table.clazz, AlternativeMapping):
+                og_parent_class = self.parent_table.clazz.original_class()
+                fields_in_og_class_but_not_in_dao = [f for f in fields(og_parent_class)
+                                                     if f not in self.parent_table.fields]
+
+                result = [r for r in result if r not in fields_in_og_class_but_not_in_dao]
+
+        return result
+
+
     @lru_cache(maxsize=None)
     def parse_fields(self):
 
-        # collect parent fields
-        if self.parent_table is not None:
-            parent_fields = fields(self.parent_table.clazz)
-        else:
-            parent_fields = []
-
-        for f in fields(self.clazz):
+        for f in self.fields:
 
             logger.info("=" * 80)
             logger.info(f"Processing Field {self.clazz.__name__}.{f.name}: {f.type}.")
@@ -273,11 +303,6 @@ class WrappedTable:
             # skip private fields
             if f.name.startswith("_"):
                 logger.info(f"Skipping since the field starts with _.")
-                continue
-
-            # skip fields from parent classes
-            if f in parent_fields:
-                logger.info(f"Skipping since the field is part of the parent class.")
                 continue
 
             field_info = FieldInfo(self.clazz, f)
@@ -368,6 +393,11 @@ class WrappedTable:
 
         self.custom_columns.append((column_name, column_type, constructor))
 
+    @property
+    def to_dao(self) -> Optional[str]:
+        if issubclass(self.clazz, AlternativeMapping):
+            return f"to_dao = {self.clazz.__module__}.{self.clazz.__name__}.to_dao"
+        return None
 
     @property
     def base_class_name(self):
