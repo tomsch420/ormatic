@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-
 from collections import defaultdict
 from dataclasses import dataclass, field, fields, Field
 from functools import cached_property, lru_cache
@@ -10,13 +9,9 @@ from typing import TextIO
 
 import rustworkx as rx
 from sqlalchemy import TypeDecorator
-from sqlalchemy.orm import relationship
-from typing_extensions import List, Type, Dict, get_origin, get_args
+from typing_extensions import List, Type, Dict
 
-from classes.example_classes import DerivedEntity
-from classes.sqlalchemy_interface import ParentDAO
-from .custom_types import TypeType
-from .dao import DataAccessObject, AlternativeMapping
+from .dao import AlternativeMapping
 from .field_info import FieldInfo
 from .sqlalchemy_generator import SQLAlchemyGenerator
 
@@ -44,6 +39,11 @@ class ORMatic:
     A direct acyclic graph containing the class hierarchy.
     """
 
+    imports: Set[str]
+    """
+    A set of modules that need to be imported.
+    """
+
     extra_imports: Dict[str, Set[str]]
     """
     A dict that maps modules to classes that should be imported via from module import class.
@@ -60,7 +60,6 @@ class ORMatic:
     """
     The string version of type mappings that is used in jinja.
     """
-
 
     def __init__(self, classes: List[Type],
                  type_mappings: Dict[Type, TypeDecorator] = None):
@@ -87,9 +86,9 @@ class ORMatic:
             else:
                 self.class_dict[cls] = WrappedTable(clazz=cls, ormatic=self)
 
-
         self.make_class_dependency_graph()
         self.extra_imports = defaultdict(set)
+        self.imports = set()
         self.make_all_tables()
 
     def create_type_annotations_map(self):
@@ -97,7 +96,8 @@ class ORMatic:
             "Type": "TypeType"
         }
         for clazz, custom_type in self.type_mappings.items():
-            self.type_annotation_map[f"{clazz.__module__}.{clazz.__name__}"] = f"{custom_type.__module__}.{custom_type.__name__}"
+            self.type_annotation_map[
+                f"{clazz.__module__}.{clazz.__name__}"] = f"{custom_type.__module__}.{custom_type.__name__}"
 
     def make_class_dependency_graph(self):
         """
@@ -109,7 +109,8 @@ class ORMatic:
         for clazz, wrapped_table in self.class_dict.items():
             self._add_wrapped_table(wrapped_table)
 
-            bases = [base for base in clazz.__bases__ if base.__module__ not in ["builtins"]  and base in self.class_dict]
+            bases = [base for base in clazz.__bases__ if
+                     base.__module__ not in ["builtins"] and base in self.class_dict]
 
             if len(bases) == 0:
                 continue
@@ -250,7 +251,6 @@ class WrappedTable:
                 "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}"
             })
 
-
     @cached_property
     def full_primary_key_name(self):
         return f"{self.tablename}.{self.primary_key_name}"
@@ -278,7 +278,6 @@ class WrappedTable:
         if self.parent_table is not None:
             skip_fields.extend(self.parent_table.fields)
 
-
         result = [field for field in fields(self.clazz) if field not in skip_fields]
 
         if self.parent_table is not None:
@@ -290,7 +289,6 @@ class WrappedTable:
                 result = [r for r in result if r not in fields_in_og_class_but_not_in_dao]
 
         return result
-
 
     @lru_cache(maxsize=None)
     def parse_fields(self):
@@ -340,7 +338,16 @@ class WrappedTable:
     def create_builtin_column(self, field_info: FieldInfo):
         if field_info.is_enum:
             self.ormatic.extra_imports[field_info.type.__module__] |= {field_info.type.__name__}
-        self.builtin_columns.append((field_info.name, f"Mapped[{field_info.field.type}]"))
+
+        if not field_info.is_builtin_class:
+            self.ormatic.imports |= {field_info.type.__module__}
+            inner_type = f"{field_info.type.__module__}.{field_info.type.__name__}"
+        else:
+            inner_type = f"{field_info.type.__name__}"
+        if field_info.optional:
+            inner_type = f"Optional[{inner_type}]"
+
+        self.builtin_columns.append((field_info.name, f"Mapped[{inner_type}]"))
 
     def create_type_type_column(self, field_info: FieldInfo):
         column_name = field_info.name

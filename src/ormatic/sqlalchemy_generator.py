@@ -59,7 +59,8 @@ class SQLAlchemyGenerator:
             module_imports |= {clazz.__module__}
 
         # Render the template
-        output = template.render(wrapped_tables=self.ormatic.wrapped_tables, module_imports=module_imports,
+        output = template.render(wrapped_tables=self.ormatic.wrapped_tables,
+                                 module_imports=module_imports | self.ormatic.imports,
             extra_imports=self.ormatic.extra_imports, type_annotation_map=self.ormatic.type_annotation_map)
 
         # Write the output to the file

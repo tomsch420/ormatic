@@ -4,9 +4,9 @@ from __future__ import annotations
 from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Enum, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing_extensions import Optional, List, Type
-from datetime import datetime
 
 import classes.example_classes
+import datetime
 from classes.example_classes import Element
 
 from ormatic.dao import DataAccessObject
@@ -24,10 +24,10 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    element: Mapped[Element]
+    element: Mapped[classes.example_classes.Element]
     type: Mapped[int]
     charge: Mapped[float]
-    timestamp: Mapped[datetime]
+    timestamp: Mapped[datetime.datetime]
 
 
 
