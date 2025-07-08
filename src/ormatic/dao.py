@@ -97,18 +97,38 @@ class DataAccessObject(HasGeneric[T]):
         # Create a new instance of the DAO class
         dao_instance = cls()
 
-        # Fuellt Superklassen Spalten auf, Mapper-columns - self.columns
+        # Fill super class columns, Mapper-columns - self.columns
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(cls)
 
-        # set the atomic fields of the dao_instance to the values from `obj`
-        for column in mapper.columns:
-            if is_data_column(column) and column.name not in obj.__dict__:
-                for parent in type(dao_instance).__bases__:
-                    if not parent == DataAccessObject and issubclass(parent.original_class(), AlternativeMapping) :
-                        custom_attribute = parent.original_class().to_dao(obj, memo=memo)
-                        setattr(dao_instance, column.name, getattr(custom_attribute, column.name))
-            elif is_data_column(column):
-                setattr(dao_instance, column.name, getattr(obj, column.name))
+        all_columns = mapper.columns
+        columns_of_this_table = cls.__table__.columns
+        columns_of_parent = [c for c in all_columns if c.name not in columns_of_this_table]
+
+        base = cls.__bases__[0]
+
+        # handle classes that have a super class that's alternatively mapped
+        if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
+
+            # create dao of alternativly mapped superclass
+            parent_dao = base.original_class().to_dao(obj)
+
+            # copy values from superclass dao
+            for column in columns_of_parent:
+                if is_data_column(column):
+                    setattr(dao_instance, column.name, getattr(parent_dao, column.name))
+
+            # copy values that only occur in this table def
+            for column in columns_of_this_table:
+                if is_data_column(column):
+                    setattr(dao_instance, column.name, getattr(obj, column.name))
+
+        else:
+
+            # copy all data required for the table
+            for column in all_columns:
+                if is_data_column(column):
+                    setattr(dao_instance, column.name, getattr(obj, column.name))
+
 
         for relationship in mapper.relationships:
             # update one to one like relationships
@@ -119,12 +139,17 @@ class DataAccessObject(HasGeneric[T]):
                     if value_in_obj is None:
                         dao_of_value = None
                     else:
-                        if get_alternative_mapping(type(value_in_obj)) is not None:
-                            dao_of_value = get_alternative_mapping(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
+                        dao_class = get_dao_class(type(value_in_obj))
+                        if dao_class is None:
+                            raise ValueError(f"Class {type(value_in_obj)} does not have a DAO.")
+                        if issubclass(dao_class.original_class(), AlternativeMapping):
+                            dao_of_value = dao_class.original_class().to_dao(value_in_obj, memo=memo)
+                            dao_of_value = dao_class.to_dao(dao_of_value, memo=memo)
                         else:
-                            dao_of_value = get_dao_class(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
+                            dao_of_value = dao_class.to_dao(value_in_obj, memo=memo)
+
                     setattr(dao_instance, relationship.key, dao_of_value)
-                except AttributeError as e:
+                except ValueError as e:
                     logger.warning(f"Skipping relationship {relationship.key} because {e} ")
 
             # update one to many relationships (list of other objects)
@@ -210,11 +235,11 @@ class AlternativeMapping(HasGeneric[T]):
             return obj
 
 @lru_cache(maxsize=None)
-def get_dao_class(cls: Type):
+def get_dao_class_of_mapped(cls: Type):
     for dao in recursive_subclasses(DataAccessObject):
         if dao.original_class() == cls:
             return dao
-    raise ValueError(f"Could not find a DAO for {cls}")
+    return None
 
 @lru_cache(maxsize=None)
 def get_alternative_mapping(cls: Type):
@@ -222,3 +247,11 @@ def get_alternative_mapping(cls: Type):
         if alt_mapping.original_class() == cls:
             return alt_mapping
     return None
+
+@lru_cache(maxsize=None)
+def get_dao_class(cls: Type):
+    alternative_mapping = get_alternative_mapping(cls)
+    if alternative_mapping:
+        return get_dao_class_of_mapped(alternative_mapping)
+    else:
+        return get_dao_class_of_mapped(cls)

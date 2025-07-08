@@ -329,6 +329,11 @@ class InterfaceTestCase(unittest.TestCase):
 
         association_dao = EntityAssociationDAO.to_dao(association)
 
+        self.assertIsInstance(association_dao, EntityAssociationDAO)
+        self.assertIsInstance(association_dao.entity, CustomEntityDAO)
+
+
+
         self.session.add(association_dao)
         self.session.commit()
 
