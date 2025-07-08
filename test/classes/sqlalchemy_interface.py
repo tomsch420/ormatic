@@ -77,6 +77,18 @@ class DoublePositionAggregatorDAO(Base, DataAccessObject[classes.example_classes
     positions2: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.doublepositionaggregatordao_positions2_id]')
 
 
+class EntityAssociationDAO(Base, DataAccessObject[classes.example_classes.EntityAssociation]):
+    __tablename__ = 'EntityAssociationDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+    entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id'), nullable=False)
+
+    entity: Mapped[CustomEntityDAO] = relationship('CustomEntityDAO', uselist=False, foreign_keys=[entity_id])
+
+
 class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.KinematicChain]):
     __tablename__ = 'KinematicChainDAO'
 

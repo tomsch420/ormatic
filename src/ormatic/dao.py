@@ -96,7 +96,6 @@ class DataAccessObject(HasGeneric[T]):
         #
         # Create a new instance of the DAO class
         dao_instance = cls()
-        memo[id(obj)] = dao_instance
 
         # Fuellt Superklassen Spalten auf, Mapper-columns - self.columns
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(cls)
@@ -120,7 +119,10 @@ class DataAccessObject(HasGeneric[T]):
                     if value_in_obj is None:
                         dao_of_value = None
                     else:
-                        dao_of_value = get_dao_class(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
+                        if get_alternative_mapping(type(value_in_obj)) is not None:
+                            dao_of_value = get_alternative_mapping(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
+                        else:
+                            dao_of_value = get_dao_class(type(value_in_obj)).to_dao(value_in_obj, memo=memo)
                     setattr(dao_instance, relationship.key, dao_of_value)
                 except AttributeError as e:
                     logger.warning(f"Skipping relationship {relationship.key} because {e} ")
@@ -135,6 +137,7 @@ class DataAccessObject(HasGeneric[T]):
                 except AttributeError as e:
                     logger.warning(f"Skipping relationship {relationship.key} because {e} ")
                 setattr(dao_instance, relationship.key, result)
+        memo[id(obj)] = dao_instance
 
         return dao_instance
 
@@ -215,7 +218,7 @@ def get_dao_class(cls: Type):
 
 @lru_cache(maxsize=None)
 def get_alternative_mapping(cls: Type):
-    for dao in recursive_subclasses(AlternativeMapping):
-        if dao.original_class() == cls:
-            return dao
+    for alt_mapping in recursive_subclasses(AlternativeMapping):
+        if alt_mapping.original_class() == cls:
+            return alt_mapping
     return None

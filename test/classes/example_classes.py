@@ -164,10 +164,11 @@ class CustomEntity(AlternativeMapping[Entity]):
     def to_dao(cls, obj: Entity, memo: Dict[int, Any] = None):
         if memo is None:
             memo = {}
-        # if id(obj) in memo:
-        #     x = memo[id(obj)]
-        #     return memo[id(obj)]
-        return cls(overwritten_name=obj.name)
+        if id(obj) in memo:
+            return memo[id(obj)]
+        result = cls(overwritten_name=obj.name)
+        memo[id(obj)] = result
+        return result
 
 class ConceptType(TypeDecorator):
     """

@@ -323,6 +323,20 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertTrue(queried_entity in queried_entities_og)
 
 
+    def test_entity_association(self):
+        entity = Entity("TestEntity")
+        association = EntityAssociation(entity=entity)
+
+        association_dao = EntityAssociationDAO.to_dao(association)
+
+        self.session.add(association_dao)
+        self.session.commit()
+
+        queried_association = self.session.scalars(select(EntityAssociationDAO)).one()
+
+        self.assertEqual(queried_association.entity.overwritten_name, entity.name)
+
+
 
 if __name__ == '__main__':
     unittest.main()
