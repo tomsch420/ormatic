@@ -23,6 +23,14 @@ dynamic = ["version", "dependencies"]
 "Source" = 'https://github.com/tomsch420/ormatic'
 "Bug Tracker" = 'https://github.com/tomsch420/ormatic/issues'
 
+[tool.setuptools]
+# make sure non-Python files are included
+include-package-data = true
+
+[tool.setuptools.package-data]
+my_library = ["templates/*.j2"]  # glob patterns allowed
+
+
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["ormatic*"]

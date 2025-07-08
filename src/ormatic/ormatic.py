@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field, fields, Field
+from dataclasses import dataclass, field, fields, Field, is_dataclass
 from functools import cached_property, lru_cache
 from typing import Any, Optional, Tuple, Set
 from typing import TextIO
@@ -79,16 +79,18 @@ class ORMatic:
         self.create_type_annotations_map()
 
         self.class_dict = {}
+        self.imports = set()
         for cls in classes:
             if issubclass(cls, AlternativeMapping):
                 # if the class is a DAO, we use the original class for the mapping
                 self.class_dict[cls.original_class()] = WrappedTable(clazz=cls, ormatic=self)
             else:
                 self.class_dict[cls] = WrappedTable(clazz=cls, ormatic=self)
+            self.imports.add(cls.__module__)
 
         self.make_class_dependency_graph()
         self.extra_imports = defaultdict(set)
-        self.imports = set()
+
         self.make_all_tables()
 
     def create_type_annotations_map(self):
@@ -221,6 +223,10 @@ class WrappedTable:
     The index of self in `self.ormatic.class_dependency_graph`. 
     """
 
+    def __post_init__(self):
+        if not is_dataclass(self.clazz):
+            raise TypeError(f"ORMatic can only process dataclasses. Got {self.clazz} which is not a dataclass.")
+
     @cached_property
     def primary_key(self):
         if self.parent_table is not None:
@@ -330,7 +336,7 @@ class WrappedTable:
             logger.info(f"Parsing as one to many relationship.")
             if field_info.is_container_of_builtin:
                 self.create_container_of_builtins(field_info)
-            else:
+            elif field_info.type in self.ormatic.class_dict:
                 self.create_one_to_many_relationship(field_info)
         else:
             logger.info("Skipping due to not handled type.")

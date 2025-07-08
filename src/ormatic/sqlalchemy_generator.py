@@ -39,7 +39,9 @@ class SQLAlchemyGenerator:
         self.ormatic = ormatic
 
         # Set up Jinja2 environment
-        template_dir = os.path.join(os.path.dirname(__file__), "..", "..", 'templates')
+        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+
+
         self.env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir), trim_blocks=True,
             lstrip_blocks=True)
 
