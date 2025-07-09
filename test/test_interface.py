@@ -251,7 +251,7 @@ class InterfaceTestCase(unittest.TestCase):
         p1, p2, p3 = Position(1, 2, 3), Position(2, 3, 4), Position(3, 4, 5)
         dpa = DoublePositionAggregator([p1, p2], [p1, p3])
         dpa_dao = DoublePositionAggregatorDAO.to_dao(dpa)
-
+        print(dpa_dao)
         self.session.add(dpa_dao)
         self.session.commit()
 

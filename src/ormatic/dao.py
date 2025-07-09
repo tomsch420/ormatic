@@ -181,39 +181,20 @@ class DataAccessObject(HasGeneric[T]):
 
 
     def __repr__(self):
-        cls = self.__class__
-        attr_items: list[tuple[str, object]] = []
+        mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
+        kwargs = {}
+        for column in mapper.columns:
+            if is_data_column(column):
+                kwargs[column.name] = repr(getattr(self, column.name))
 
-        # 1) Try to obtain the SQLAlchemy mapper to get the column order.
-        try:
-            from sqlalchemy.inspection import inspect as _sa_inspect
+        for relationship in mapper.relationships:
+            value = getattr(self, relationship.key)
+            kwargs[relationship.key] = repr(value)
 
-            mapper = _sa_inspect(cls, raiseerr=False)
-            if mapper is not None:
-                for column in mapper.columns:
-                    key = column.key
-                    # Attributes might be deferred / unloaded, getattr handles that.
-                    if not key.startswith("_"):
-                        attr_items.append((key, getattr(self, key, None)))
-        except Exception:  # pragma: no cover – any error → graceful fallback
-            mapper = None  # noqa: F841 – keep the name for clarity
+        kwargs_str = "\n".join([f"{key}={value}" for key, value in kwargs.items()])
 
-        # 2) Fallback to type hints declared on the class.
-        if not attr_items and hasattr(cls, "__annotations__"):
-            for key in cls.__annotations__:
-                if not key.startswith("_") and hasattr(self, key):
-                    attr_items.append((key, getattr(self, key)))
-
-                    # 3) Final fallback to whatever is present on the instance.
-        if not attr_items:
-            for key, value in self.__dict__.items():
-                if not key.startswith("_"):
-                    attr_items.append((key, value))
-
-                    # Build the string.
-        inner = ", ".join(f"{k}={v!r}" for k, v in attr_items)
-        return f"{cls.__name__}({inner})"
-
+        result = f"{type(self).__name__}({kwargs_str})"
+        return result
 
 class AlternativeMapping(HasGeneric[T]):
 
