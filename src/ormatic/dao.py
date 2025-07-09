@@ -225,14 +225,30 @@ class AlternativeMapping(HasGeneric[T]):
     @classmethod
     def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
         """
-        Specifies how to build an instance of this class from an instance of the original class.
+        Create a DAO from the obj if it doesn't exist.
+
+        :param obj: The obj to create the DAO from.
+        :param memo: The memo dictionary to check for already build instances.
+
+        :return: An instance of this class created from the obj.
         """
         if memo is None:
             memo = {}
         if id(obj) in memo:
             return memo[id(obj)]
         else:
-            return obj
+            return cls.create_instance(obj)
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        """
+        Create a DAO from the obj.
+        The method needs to be overloaded by the user.
+
+        :param obj: The obj to create the DAO from.
+        :return: An instance of this class created from the obj.
+        """
+        raise NotImplementedError
 
 @lru_cache(maxsize=None)
 def get_dao_class_of_mapped(cls: Type):
