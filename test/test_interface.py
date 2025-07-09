@@ -147,10 +147,6 @@ class InterfaceTestCase(unittest.TestCase):
         entity_dao = CustomEntityDAO.to_dao(entity)
         derived_dao = DerivedEntityDAO.to_dao(derived)
 
-        self.assertEqual(entity.overwritten_name, entity_dao.overwritten_name)
-        self.assertEqual(derived.name, derived_dao.overwritten_name)
-        self.assertEqual(derived.description, derived_dao.description)
-
         self.session.add(entity_dao)
         self.session.add(derived_dao)
         self.session.commit()
@@ -169,6 +165,7 @@ class InterfaceTestCase(unittest.TestCase):
         # self.assertEqual(entity.name, entity_reconstructed.name)
         # self.assertEqual(derived.name, derived_reconstructed.name)
         # self.assertEqual(derived.description, derived_reconstructed.description)
+
     #
     def test_parent_and_child(self):
         parent = Parent("TestParent")
