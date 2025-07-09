@@ -72,7 +72,7 @@ class DataAccessObject(HasGeneric[T]):
 
 
     @classmethod
-    def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
+    def to_dao(cls, obj: T, memo: Dict[int, Any] = None, register=True) -> _DAO:
         """
         Converts an object to its Data Access Object (DAO) equivalent using a class method. This method ensures that
         objects are not processed multiple times by utilizing a memoization technique. It also handles alternative
@@ -92,7 +92,7 @@ class DataAccessObject(HasGeneric[T]):
 
         # apply alternative mapping if needed
         if issubclass(cls.original_class(), AlternativeMapping):
-            obj = cls.original_class().to_dao(obj, memo=memo)
+            obj = cls.original_class().to_dao(obj, memo=memo, )
 
         # get the primary inheritance route
         base = cls.__bases__[0]
@@ -104,7 +104,8 @@ class DataAccessObject(HasGeneric[T]):
         else:
             result.to_dao_default(obj=obj, memo=memo)
 
-        memo[id(obj)] = result
+        if register:
+            memo[id(obj)] = result
         return result
 
     def to_dao_default(self, obj: T, memo: Dict[int, Any]):
@@ -139,7 +140,7 @@ class DataAccessObject(HasGeneric[T]):
         """
 
         # create dao of alternatively mapped superclass
-        parent_dao = base.original_class().to_dao(obj, memo=memo)
+        parent_dao = base.original_class().to_dao(obj, memo=memo, register=False)
 
         # Fill super class columns
         parent_mapper = sqlalchemy.inspection.inspect(base)
@@ -271,7 +272,9 @@ class AlternativeMapping(HasGeneric[T]):
         if id(obj) in memo:
             return memo[id(obj)]
         else:
-            return cls.create_instance(obj)
+            result = cls.create_instance(obj)
+            memo[id(obj)] = result
+            return result
 
     @classmethod
     def create_instance(cls, obj: T):
