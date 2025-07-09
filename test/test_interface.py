@@ -20,10 +20,7 @@ class InterfaceTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        ormatic.dao.logger.addHandler(handler)
-        ormatic.dao.logger.setLevel(logging.INFO)
+        # Logger configuration is now handled in ormatic/__init__.py
         configure_mappers()
 
         cls.engine = create_engine('sqlite:///:memory:')

@@ -19,10 +19,8 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        ormatic.ormatic.logger.addHandler(handler)
-        ormatic.ormatic.logger.setLevel(logging.DEBUG)
+        # Logger configuration is now handled in ormatic/__init__.py
+        # Note: Default log level is INFO, was DEBUG here
 
         all_classes = set(classes_of_module(example_classes))
         all_classes -= set(recursive_subclasses(DataAccessObject))
