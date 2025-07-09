@@ -210,7 +210,7 @@ class DataAccessObject(HasGeneric[T]):
                 if value_in_obj is None:
                     dao_of_value = None
                 else:
-                    dao_class = get_dao_class(type)
+                    dao_class = get_dao_class(type(value_in_obj))
                     if dao_class is None:
                         raise ValueError(f"Class {type(value_in_obj)} does not have a DAO. This happened when trying"
                                          f"to create a dao for {obj}")
