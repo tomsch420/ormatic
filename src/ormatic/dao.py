@@ -191,7 +191,7 @@ class DataAccessObject(HasGeneric[T]):
             value = getattr(self, relationship.key)
             kwargs[relationship.key] = repr(value)
 
-        kwargs_str = "\n    ".join([f"{key}={value}" for key, value in kwargs.items()])
+        kwargs_str = ",\n    ".join([f"{key}={value}" for key, value in kwargs.items()])
 
         result = f"{type(self).__name__}(\n    {kwargs_str}\n)"
         return result
