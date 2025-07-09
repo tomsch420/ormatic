@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, Engine, select
 from sqlalchemy.orm import registry, Session, configure_mappers
 
 from classes.example_classes import *
-import ormatic.dao
+from ormatic.dao import to_dao
 
 from ormatic.ormatic import ORMatic
 from ormatic.utils import classes_of_module, recursive_subclasses
@@ -141,11 +141,11 @@ class InterfaceTestCase(unittest.TestCase):
 
 
     def test_entity_and_derived(self):
-        entity = CustomEntity("TestEntity")
-        derived = DerivedEntity("DerivedEntity", "Test Description")
+        entity = Entity("TestEntity")
+        derived = DerivedEntity("DerivedEntity")
 
-        entity_dao = CustomEntityDAO.to_dao(entity)
-        derived_dao = DerivedEntityDAO.to_dao(derived)
+        entity_dao = to_dao(entity)
+        derived_dao = to_dao(derived)
 
         self.session.add(entity_dao)
         self.session.add(derived_dao)
@@ -155,7 +155,7 @@ class InterfaceTestCase(unittest.TestCase):
         queried_entity = self.session.scalars(select(CustomEntityDAO)).first()
         queried_derived = self.session.scalars(select(DerivedEntityDAO)).first()
 
-        self.assertEqual(entity.overwritten_name, queried_entity.overwritten_name)
+        self.assertEqual(entity.name, queried_entity.overwritten_name)
         self.assertEqual(derived.name, queried_derived.overwritten_name)
         self.assertEqual(derived.description, queried_derived.description)
 
@@ -320,7 +320,7 @@ class InterfaceTestCase(unittest.TestCase):
         entity = Entity("TestEntity")
         association = EntityAssociation(entity=entity)
 
-        association_dao = EntityAssociationDAO.to_dao(association)
+        association_dao = to_dao(association)
 
         self.assertIsInstance(association_dao, EntityAssociationDAO)
         self.assertIsInstance(association_dao.entity, CustomEntityDAO)

@@ -5,8 +5,8 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, Date
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from typing_extensions import Optional, List, Type
 
-import classes.example_classes
 import datetime
+import classes.example_classes
 from classes.example_classes import Element
 
 from ormatic.dao import DataAccessObject
