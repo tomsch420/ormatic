@@ -89,11 +89,6 @@ class DataAccessObject(HasGeneric[T]):
         if id(obj) in memo:
             return memo[id(obj)]
 
-        # TODO if the object passed in has an alternative mapping, construct the alternative mapping first
-        # if isinstance(obj, AlternativeMapping):
-        #     alternative_mapping_cls = get_alternative_mapping(type(obj))
-        #     obj = alternative_mapping_cls.from_dao(obj, memo=memo)
-        #
         # Create a new instance of the DAO class
         dao_instance = cls()
 
@@ -110,7 +105,7 @@ class DataAccessObject(HasGeneric[T]):
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
 
             # create dao of alternativly mapped superclass
-            parent_dao = base.original_class().to_dao(obj)
+            parent_dao = base.original_class().to_dao(obj, memo=memo)
 
             # copy values from superclass dao
             for column in columns_of_parent:
