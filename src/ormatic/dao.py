@@ -140,7 +140,7 @@ class DataAccessObject(HasGeneric[T]):
         """
 
         # create dao of alternatively mapped superclass
-        parent_dao = base.original_class().to_dao(obj, memo=memo, register=False)
+        parent_dao = base.original_class().to_dao(obj, memo=memo)
 
         # Fill super class columns
         parent_mapper = sqlalchemy.inspection.inspect(base)
