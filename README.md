@@ -1,21 +1,21 @@
 # Welcome to ORMatic
 
 ORMatic is a python package that automatically converts python dataclasses to sqlalchemy tables.
-This is done using the [imperative mapping](https://docs.sqlalchemy.org/en/20/orm/mapping_styles.html#imperative-mapping).
+This is done using the [declarative mapping](https://docs.sqlalchemy.org/en/20/orm/mapping_styles.html#imperative-mapping).
 
 When designing the dataclasses there are a couple of rules that need to be followed:
 - Fields that are not mapped start with an `_` (underscore).
-- The only allowed union is the `Optional[_T]` union. Whenever you want a union of other types, use inheritance instead.
+- The only allowed union is the `Optional[_T]` union. Whenever you want a union of other types, use common 
+superclasses as type instead.
 - Iterables are never optional and never nested. 
 If you want an optional iterable, use an empty iterable as default factory instead.
-- No multiple inheritance.
-- No forward referenced classes.
+- Superclasses that are not the first mentioned superclass are not queryable via abstract queries. (Polymorphic identity)  
 
 Features:
 - Automatic conversion of dataclasses to sqlalchemy tables.
 - Automatic application of relationships.
 - Automatic generation of ORM interface.
-- ORM interface only affects your code if it is imported.
+- ORM interface never affects your existing code.
 
 - Support for inheritance.
 - Support for optional fields.
@@ -34,7 +34,6 @@ Example usage of the ORM interface is found in [integration.py](https://github.c
 The following script generates the bindings in [orm_interface.py](https://github.com/tomsch420/ormatic/blob/master/test/orm_interface.py).
 
 ```python
-import sqlacodegen.generators
 from sqlalchemy import create_engine
 from sqlalchemy.orm import registry, Session
 
@@ -43,22 +42,23 @@ from ormatic.ormatic import ORMatic
 
 
 def main():
-    mapper_registry = registry()
-
     engine = create_engine('sqlite:///:memory:')
 
     classes = [Position, Orientation, Pose, Position4D, Positions, EnumContainer, Node]
-    ormatic = ORMatic(classes, mapper_registry)
+    ormatic = ORMatic(classes)
     ormatic.make_all_tables()
     mapper_registry.metadata.create_all(engine)
 
-    generator = sqlacodegen.generators.TablesGenerator(mapper_registry.metadata, engine, [])
-
     with open('orm_interface.py', 'w') as f:
-        ormatic.to_python_file(generator, f)
+        ormatic.to_sqlalchemy_file(f)
 
 
 if __name__ == '__main__':
     main()
 
+
 ```
+
+# TODO List
+- Fields that are typed as Sequence should be stored as list
+- Check deep inheritance
