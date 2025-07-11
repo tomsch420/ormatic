@@ -1,20 +1,14 @@
-import logging
-import os
-import sys
 import unittest
+
 from sqlalchemy import create_engine, Engine, select
-from sqlalchemy.orm import registry, Session, configure_mappers
+from sqlalchemy.orm import Session, configure_mappers
 
 from classes.example_classes import *
-from ormatic.dao import to_dao
-
-from ormatic.ormatic import ORMatic
-from ormatic.utils import classes_of_module, recursive_subclasses
 from classes.sqlalchemy_interface import *
+from ormatic.dao import to_dao
 
 
 class InterfaceTestCase(unittest.TestCase):
-
     session: Session
     engine: Engine
 
@@ -57,7 +51,6 @@ class InterfaceTestCase(unittest.TestCase):
 
         p1_reconstructed = queried_p1.from_dao()
         self.assertEqual(p1, p1_reconstructed)
-
 
     def test_position4d(self):
         p4d = Position4D(1.0, 2.0, 3.0, 4.0)
@@ -139,7 +132,6 @@ class InterfaceTestCase(unittest.TestCase):
         atom_from_session = queried.from_dao()
         self.assertEqual(atom, atom_from_session)
 
-
     def test_entity_and_derived(self):
         entity = Entity("TestEntity")
         derived = DerivedEntity("DerivedEntity")
@@ -194,15 +186,14 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(child_mapped.name, queried_child[0].name)
         self.assertEqual(child_mapped.attribute1, queried_child[0].attribute1)
 
-        # parent_reconstructed = queried_parent.from_dao()
-        # child_reconstructed = queried_child.from_dao()
-        #
-        # self.assertEqual(parent.name, parent_reconstructed.name)
-        # self.assertEqual(child_mapped.name, child_reconstructed.name)
-        # self.assertEqual(child_mapped.attribute1, child_reconstructed.attribute1)
+        parent_reconstructed = queried_parent[0].from_dao()
+        child_reconstructed = queried_child[0].from_dao()
+
+        self.assertEqual(parent.name, parent_reconstructed.name)
+        self.assertEqual(child_mapped.name, child_reconstructed.name)
+        self.assertEqual(child_mapped.attribute1, child_reconstructed.attribute1)
 
     def test_node(self):
-
         n1 = Node()
         n2 = Node(parent=n1)
         n3 = Node(parent=n1)
@@ -224,6 +215,7 @@ class InterfaceTestCase(unittest.TestCase):
 
         result = self.session.scalars(select(PositionTypeWrapperDAO)).one()
         self.assertEqual(result, dao)
+
     #
     def test_positions(self):
         p1 = Position(1, 2, 3)
@@ -243,7 +235,6 @@ class InterfaceTestCase(unittest.TestCase):
 
         self.assertEqual(len(result.positions), 2)
 
-
     def test_double_position_aggregator(self):
         p1, p2, p3 = Position(1, 2, 3), Position(2, 3, 4), Position(3, 4, 5)
         dpa = DoublePositionAggregator([p1, p2], [p1, p3])
@@ -258,11 +249,10 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(queried, dpa_dao)
         self.assertTrue(queried.positions1[0] in queried_positions)
 
-
     def test_kinematic_chain_and_torso(self):
         k1 = KinematicChain("a")
         k2 = KinematicChain("b")
-        torso = Torso("t", [k1 ,k2])
+        torso = Torso("t", [k1, k2])
         torso_dao = TorsoDAO.to_dao(torso)
 
         self.session.add(torso_dao)
@@ -270,10 +260,6 @@ class InterfaceTestCase(unittest.TestCase):
 
         queried_torso = self.session.scalars(select(TorsoDAO)).one()
         self.assertEqual(queried_torso, torso_dao)
-    #
-    # def test_original_simulated_object_and_annotation(self):
-    #     # Skip this test for now due to issues with relationship handling
-    #     self.skipTest("Skipping test due to issues with relationship handling")
 
     def test_custom_types(self):
         ogs = OriginalSimulatedObject(Bowl(), 1)
@@ -287,27 +273,14 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(ogs_dao, queried)
         self.assertIsInstance(queried.concept, Bowl)
 
-    # To dao ueberschreiben wenn overwritten attributes
-    # fields
     def test_inheriting_from_explicit_mapping(self):
         entity: DerivedEntity = DerivedEntity(name="TestEntity")
 
-        # print(CustomEntity.to_dao(entity))
-        # print(DerivedEntity.__bases__)
-
-        # subclass of an alternative mapping:
-        # 1. create superclass DAO
-        # 2. figure out what columns are from the superclass
-        # 3. read the columns from the super class
-        # 4. fill the subclass DAO with the subclass columns
-
         # entity association, hat entity vom typ
-
         entity_dao = DerivedEntityDAO.to_dao(entity)
         self.assertIsInstance(entity_dao, DerivedEntityDAO)
         self.session.add(entity_dao)
         self.session.commit()
-
 
         queried_entities_og = self.session.scalars(select(CustomEntityDAO)).all()
         queried_entity = self.session.scalars(select(DerivedEntityDAO)).one()
@@ -315,6 +288,8 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertTrue(queried_entity.overwritten_name is not None)
         self.assertTrue(queried_entity in queried_entities_og)
 
+        reconstructed = queried_entity.from_dao()
+        self.assertEqual(reconstructed, entity)
 
     def test_entity_association(self):
         entity = Entity("TestEntity")
@@ -325,15 +300,14 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIsInstance(association_dao, EntityAssociationDAO)
         self.assertIsInstance(association_dao.entity, CustomEntityDAO)
 
-
-
         self.session.add(association_dao)
         self.session.commit()
 
         queried_association = self.session.scalars(select(EntityAssociationDAO)).one()
 
         self.assertEqual(queried_association.entity.overwritten_name, entity.name)
-
+        reconstructed = queried_association.from_dao()
+        self.assertEqual(reconstructed, association)
 
 
 if __name__ == '__main__':

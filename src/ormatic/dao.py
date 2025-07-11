@@ -260,7 +260,15 @@ class DataAccessObject(HasGeneric[T]):
                 setattr(self, relationship.key, result)
 
     def from_dao(self, memo: Dict[int, Any] = None) -> T:
+        """
+        Converts the current Data Access Object (DAO) into its corresponding domain model
+        representation. This method ensures that all scalar attributes and relationships
+        defined for the DAO are properly mapped to the original domain model.
 
+        :param memo: A dictionary used to maintain references to already-processed objects
+        to avoid duplications or cycles during DAO construction.
+        :return: The corresponding domain model representing the current Data Access Object
+        """
         # check memo
         if memo is None:
             memo = {}
@@ -309,9 +317,22 @@ class DataAccessObject(HasGeneric[T]):
         # if i am the child of an alternatively mapped parent
         base = self.__class__.__bases__[0]
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
+
             # construct the super class from the super dao
-            print(base)
-            base_result = base.from_dao(self=self, memo=memo)
+            parent_dao = base()  # empty parent DAO
+            parent_mapper = sqlalchemy.inspection.inspect(base)
+
+            # copy scalar columns that the parent DAO is aware of
+            for column in parent_mapper.columns:
+                if is_data_column(column):
+                    setattr(parent_dao, column.name, getattr(self, column.name))
+
+            # copy relationships that the parent DAO is aware of
+            for rel in parent_mapper.relationships:
+                setattr(parent_dao, rel.key, getattr(self, rel.key))
+
+            # now safely reconstruct the parent domain object
+            base_result = parent_dao.from_dao(memo=memo)
 
             # fill the gaps from the base result
             for argument in argument_names:
@@ -321,13 +342,7 @@ class DataAccessObject(HasGeneric[T]):
                 except AttributeError:
                     ...
 
-
         # assemble result and memoize
-        print("=" * 80)
-        print(self.original_class())
-        print(self)
-        print(kwargs)
-        print(argument_names)
         result = self.original_class()(**kwargs)
         if isinstance(result, AlternativeMapping):
             result = result.create_from_dao()
