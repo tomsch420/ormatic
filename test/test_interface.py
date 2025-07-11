@@ -55,8 +55,8 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(p1.y, queried_p1.y)
         self.assertEqual(p1.z, queried_p1.z)
 
-        # p1_reconstructed = queried_p1.from_dao()
-        # self.assertEqual(p1, p1_reconstructed)
+        p1_reconstructed = queried_p1.from_dao()
+        self.assertEqual(p1, p1_reconstructed)
 
 
     def test_position4d(self):
@@ -79,9 +79,9 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(p4d.y, queried_p4d.y)
         self.assertEqual(p4d.z, queried_p4d.z)
         self.assertEqual(p4d.w, queried_p4d.w)
-        #
-        # p4d_reconstructed = queried_p4d.from_dao()
-        # self.assertEqual(p4d, p4d_reconstructed)
+
+        p4d_reconstructed = queried_p4d.from_dao()
+        self.assertEqual(p4d, p4d_reconstructed)
 
     def test_orientation(self):
         o1 = Orientation(1.0, 2.0, 3.0, None)
@@ -103,8 +103,8 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(o1.z, queried_o1.z)
         self.assertEqual(o1.w, queried_o1.w)
 
-        # o1_reconstructed = queried_o1.from_dao()
-        # self.assertEqual(o1, o1_reconstructed)
+        o1_reconstructed = queried_o1.from_dao()
+        self.assertEqual(o1, o1_reconstructed)
 
     def test_pose(self):
         p1 = Position(1, 2, 3)
@@ -122,9 +122,9 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIsNotNone(queried.position)
         self.assertIsNotNone(queried.orientation)
         self.assertEqual(queried, posedao)
-        # queried = queried.from_dao()
-        # self.assertEqual(pose, queried)
-    #
+        queried = queried.from_dao()
+        self.assertEqual(pose, queried)
+
     def test_atom(self):
         atom = Atom(Element.C, 1, 2.)
         atomdao = AtomDAO.to_dao(atom)
@@ -136,8 +136,8 @@ class InterfaceTestCase(unittest.TestCase):
         queried = self.session.scalars(select(AtomDAO)).one()
         self.assertIsInstance(queried.element, Element)
 
-        # atom_from_session = queried.from_dao()
-        # self.assertEqual(atom, atom_from_session)
+        atom_from_session = queried.from_dao()
+        self.assertEqual(atom, atom_from_session)
 
 
     def test_entity_and_derived(self):
@@ -159,12 +159,12 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(derived.name, queried_derived.overwritten_name)
         self.assertEqual(derived.description, queried_derived.description)
 
-        # entity_reconstructed = queried_entity.from_dao()
-        # derived_reconstructed = queried_derived.from_dao()
-        #
-        # self.assertEqual(entity.name, entity_reconstructed.name)
-        # self.assertEqual(derived.name, derived_reconstructed.name)
-        # self.assertEqual(derived.description, derived_reconstructed.description)
+        entity_reconstructed = queried_entity.from_dao()
+        derived_reconstructed = queried_derived.from_dao()
+
+        self.assertEqual(entity.name, entity_reconstructed.name)
+        self.assertEqual(derived.name, derived_reconstructed.name)
+        self.assertEqual(derived.description, derived_reconstructed.description)
 
     #
     def test_parent_and_child(self):

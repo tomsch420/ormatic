@@ -9,7 +9,7 @@ from typing import Dict, Any
 from sqlalchemy import types, TypeDecorator
 from typing_extensions import List, Optional, Type
 
-from ormatic.dao import DataAccessObject, AlternativeMapping
+from ormatic.dao import DataAccessObject, AlternativeMapping, T
 
 
 # check that custom enums works
@@ -164,6 +164,9 @@ class CustomEntity(AlternativeMapping[Entity]):
     def create_instance(cls, obj: Entity):
         result = cls(overwritten_name=obj.name)
         return result
+
+    def create_from_dao(self) -> T:
+        return Entity(name=self.overwritten_name)
 
 class ConceptType(TypeDecorator):
     """

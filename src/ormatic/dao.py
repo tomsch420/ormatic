@@ -1,16 +1,14 @@
 from __future__ import annotations
 
+import inspect
 import logging
-from dataclasses import fields, is_dataclass
 from functools import lru_cache
 from typing import Optional, List
 
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import Column
-from sqlalchemy.orm import MANYTOONE, DeclarativeBase, declared_attr, ONETOMANY, RelationshipProperty
-from sqlalchemy.sql.schema import Table
-from sqlalchemy.util import ReadOnlyProperties
+from sqlalchemy.orm import MANYTOONE, ONETOMANY, RelationshipProperty
 from typing_extensions import Type, get_args, Dict, Any, TypeVar, Generic
 
 from .utils import recursive_subclasses
@@ -22,13 +20,47 @@ _DAO = TypeVar("_DAO", bound="DataAccessObject")
 
 
 class NoGenericError(TypeError):
+    """
+    Exception raised when the original class for a DataAccessObject subclass cannot
+    be determined.
+
+    This exception is typically raised when a DataAccessObject subclass has not
+    been parameterized properly, which prevents identifying the original class
+    associated with it.
+    """
     def __init__(self, cls):
         super().__init__(f"Cannot determine original class for {cls.__name__!r}. "
                          "Did you forget to parameterise the DataAccessObject subclass?")
 
 
+class NoDAOFoundError(TypeError):
+    """
+    Represents an error raised when no DAO (Data Access Object) class is found for a given class.
+
+    This exception is typically used when an attempt to convert a class into a corresponding DAO fails.
+    It provides information about the class and the DAO involved.
+    """
+
+    cls: Type
+    """
+    The class that no dao was found for
+    """
+
+    dao: Optional[Type]
+    """
+    The DAO class that tried to convert the cls to a DAO if any.
+    """
+
+    def __init__(self, cls: Type, dao: Optional[Type] = None):
+        self.cls = cls
+        self.dao = dao
+        super().__init__(f"Class {cls} does not have a DAO. This happened when trying"
+                         f"to create a dao for {dao}).")
+
+
 def is_data_column(column: Column):
     return not column.primary_key and len(column.foreign_keys) == 0 and column.name != "polymorphic_type"
+
 
 class HasGeneric(Generic[T]):
 
@@ -61,6 +93,7 @@ class HasGeneric(Generic[T]):
         except (AttributeError, IndexError):
             raise NoGenericError(cls)
 
+
 class DataAccessObject(HasGeneric[T]):
     """
     This class defines the interfaces the DAO classes should implement.
@@ -70,17 +103,17 @@ class DataAccessObject(HasGeneric[T]):
     This class describes the necessary functionality.
     """
 
-
     @classmethod
     def to_dao(cls, obj: T, memo: Dict[int, Any] = None, register=True) -> _DAO:
         """
         Converts an object to its Data Access Object (DAO) equivalent using a class method. This method ensures that
-        objects are not processed multiple times by utilizing a memoization technique. It also handles alternative
+        objects are not processed multiple times by using a memoization technique. It also handles alternative
         mappings for objects and applies transformation logic based on class inheritance and mapping requirements.
 
         :param obj: Object to be converted into its DAO equivalent
         :param memo: Dictionary that keeps track of already converted objects to avoid duplicate processing.
             Defaults to None.
+        :param register: Whether to register the DAO class in the memo.
         :return: Instance of the DAO class (_DAO) that represents the input object after conversion
         """
 
@@ -186,8 +219,7 @@ class DataAccessObject(HasGeneric[T]):
             if is_data_column(column):
                 setattr(self, column.name, getattr(obj, column.name))
 
-    def get_relationships_from(self, obj: T, relationships: List[RelationshipProperty],
-                            memo: Dict[int, Any]):
+    def get_relationships_from(self, obj: T, relationships: List[RelationshipProperty], memo: Dict[int, Any]):
         """
         Retrieve and update relationships from an object based on the given relationship
         properties. This function processes various types of relationships (e.g., one-to-one,
@@ -204,8 +236,8 @@ class DataAccessObject(HasGeneric[T]):
         for relationship in relationships:
 
             # update one to one like relationships
-            if (relationship.direction == MANYTOONE or
-                    (relationship.direction == ONETOMANY and not relationship.uselist)):
+            if (relationship.direction == MANYTOONE or (
+                    relationship.direction == ONETOMANY and not relationship.uselist)):
 
                 value_in_obj = getattr(obj, relationship.key)
                 if value_in_obj is None:
@@ -213,8 +245,7 @@ class DataAccessObject(HasGeneric[T]):
                 else:
                     dao_class = get_dao_class(type(value_in_obj))
                     if dao_class is None:
-                        raise ValueError(f"Class {type(value_in_obj)} does not have a DAO. This happened when trying"
-                                         f"to create a dao for {obj}")
+                        raise NoDAOFoundError(type(value_in_obj), type(self))
                     dao_of_value = dao_class.to_dao(value_in_obj, memo=memo)
 
                 setattr(self, relationship.key, dao_of_value)
@@ -229,15 +260,79 @@ class DataAccessObject(HasGeneric[T]):
                 setattr(self, relationship.key, result)
 
     def from_dao(self, memo: Dict[int, Any] = None) -> T:
-        """
-        Create the original instance of this class from an instance of this DAO.
-        If a different specification than the specification of the original class is needed, overload this method.
 
-        :param memo: The memo dictionary to use for memoization.
-        :return: An instance of this class created from the original class.
-        """
-        raise NotImplementedError
+        # check memo
+        if memo is None:
+            memo = {}
+        if id(self) in memo:
+            return memo[id(self)]
 
+        mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
+
+        # get argument names of the original class
+        kwargs = dict()
+        init_of_original_class = self.original_class().__init__
+        argument_names = [p.name for p in inspect.signature(init_of_original_class).parameters.values()][1:]
+
+        # get data columns
+        for column in mapper.columns:
+            if column.name not in argument_names:
+                continue
+
+            if is_data_column(column):
+                kwargs[column.name] = getattr(self, column.name)
+
+        # get relationships
+        for relationship in mapper.relationships:
+            if relationship.key not in argument_names:
+                continue
+
+            value = getattr(self, relationship.key)
+
+            # handle one-to-one relationships
+            if (relationship.direction == MANYTOONE or (
+                    relationship.direction == ONETOMANY and not relationship.uselist)):
+                if value is None:
+                    parsed = value
+                else:
+                    parsed = value.from_dao(memo=memo)
+
+            # handle on to many relationships
+            elif relationship.direction == ONETOMANY:
+                og_instances = [v.from_dao(memo=memo) for v in value]
+                parsed = type(value)(og_instances)
+            else:
+                raise NotImplementedError(f"Cannot parse relationship {relationship}")
+
+            kwargs[relationship.key] = parsed
+
+        # if i am the child of an alternatively mapped parent
+        base = self.__class__.__bases__[0]
+        if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
+            # construct the super class from the super dao
+            print(base)
+            base_result = base.from_dao(self=self, memo=memo)
+
+            # fill the gaps from the base result
+            for argument in argument_names:
+                try:
+                    base_result_value = getattr(base_result, argument)
+                    kwargs[argument] = base_result_value
+                except AttributeError:
+                    ...
+
+
+        # assemble result and memoize
+        print("=" * 80)
+        print(self.original_class())
+        print(self)
+        print(kwargs)
+        print(argument_names)
+        result = self.original_class()(**kwargs)
+        if isinstance(result, AlternativeMapping):
+            result = result.create_from_dao()
+        memo[id(self)] = result
+        return result
 
     def __repr__(self):
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
@@ -254,6 +349,7 @@ class DataAccessObject(HasGeneric[T]):
 
         result = f"{type(self).__name__}({kwargs_str})"
         return result
+
 
 class AlternativeMapping(HasGeneric[T]):
 
@@ -287,6 +383,18 @@ class AlternativeMapping(HasGeneric[T]):
         """
         raise NotImplementedError
 
+    def create_from_dao(self) -> T:
+        """
+        Creates an object from a Data Access Object (DAO) by utilizing the predefined
+        logic and transformations specific to the implementation. This facilitates
+        constructing domain-specific objects from underlying data representations.
+
+        :return: The object created from the DAO.
+        :rtype: T
+        """
+        raise NotImplementedError
+
+
 @lru_cache(maxsize=None)
 def get_dao_class(cls: Type) -> Optional[Type[DataAccessObject]]:
     if get_alternative_mapping(cls) is not None:
@@ -295,6 +403,7 @@ def get_dao_class(cls: Type) -> Optional[Type[DataAccessObject]]:
         if dao.original_class() == cls:
             return dao
     return None
+
 
 @lru_cache(maxsize=None)
 def get_alternative_mapping(cls: Type) -> Optional[Type[DataAccessObject]]:
@@ -308,4 +417,7 @@ def to_dao(obj: Any, memo: Dict[int, Any] = None) -> DataAccessObject:
     """
     Convert any object to a dao class.
     """
-    return get_dao_class(type(obj)).to_dao(obj, memo)
+    dao_class = get_dao_class(type(obj))
+    if dao_class is None:
+        raise NoDAOFoundError(type(obj))
+    return dao_class.to_dao(obj, memo)
