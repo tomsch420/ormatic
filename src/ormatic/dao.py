@@ -46,16 +46,28 @@ class NoDAOFoundError(TypeError):
     The class that no dao was found for
     """
 
-    dao: Optional[Type]
+    def __init__(self, cls: Type):
+        self.cls = cls
+        super().__init__(f"Class {cls} does not have a DAO.")
+
+
+class NoDAOFoundDuringParsingError(NoDAOFoundError):
+
+    dao: Type
     """
     The DAO class that tried to convert the cls to a DAO if any.
     """
 
-    def __init__(self, cls: Type, dao: Optional[Type] = None):
+    relationship: RelationshipProperty
+
+    def __init__(self, cls: Type, dao: Type, relationship: RelationshipProperty = None):
         self.cls = cls
         self.dao = dao
-        super().__init__(f"Class {cls} does not have a DAO. This happened when trying"
-                         f"to create a dao for {dao}).")
+        self.relationship = relationship
+        TypeError.__init__(self, f"Class {cls} does not have a DAO. This happened when trying"
+                         f"to create a dao for {dao}) on the relationship {relationship}.")
+
+
 
 
 def is_data_column(column: Column):
@@ -245,7 +257,7 @@ class DataAccessObject(HasGeneric[T]):
                 else:
                     dao_class = get_dao_class(type(value_in_obj))
                     if dao_class is None:
-                        raise NoDAOFoundError(type(value_in_obj), type(self))
+                        raise NoDAOFoundDuringParsingError(type(value_in_obj), type(self), relationship)
                     dao_of_value = dao_class.to_dao(value_in_obj, memo=memo)
 
                 setattr(self, relationship.key, dao_of_value)
