@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, configure_mappers
 
 from classes.example_classes import *
 from classes.sqlalchemy_interface import *
-from ormatic.dao import to_dao
+from ormatic.dao import to_dao, NoDAOFoundDuringParsingError
 
 
 class InterfaceTestCase(unittest.TestCase):
@@ -307,6 +307,10 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(queried_association.entity.overwritten_name, entity.name)
         reconstructed = queried_association.from_dao()
         self.assertEqual(reconstructed, association)
+
+    def test_assertion(self):
+        p = Pose([1,2,3], "a")
+        self.assertRaises(NoDAOFoundDuringParsingError, to_dao, p)
 
 
 if __name__ == '__main__':

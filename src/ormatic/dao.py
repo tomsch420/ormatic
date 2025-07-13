@@ -28,6 +28,7 @@ class NoGenericError(TypeError):
     been parameterized properly, which prevents identifying the original class
     associated with it.
     """
+
     def __init__(self, cls):
         super().__init__(f"Cannot determine original class for {cls.__name__!r}. "
                          "Did you forget to parameterise the DataAccessObject subclass?")
@@ -41,18 +42,17 @@ class NoDAOFoundError(TypeError):
     It provides information about the class and the DAO involved.
     """
 
-    cls: Type
+    obj: Any
     """
     The class that no dao was found for
     """
 
-    def __init__(self, cls: Type):
-        self.cls = cls
-        super().__init__(f"Class {cls} does not have a DAO.")
+    def __init__(self, obj: Any):
+        self.obj = obj
+        super().__init__(f"Class {type(obj)} does not have a DAO.")
 
 
 class NoDAOFoundDuringParsingError(NoDAOFoundError):
-
     dao: Type
     """
     The DAO class that tried to convert the cls to a DAO if any.
@@ -60,14 +60,14 @@ class NoDAOFoundDuringParsingError(NoDAOFoundError):
 
     relationship: RelationshipProperty
 
-    def __init__(self, cls: Type, dao: Type, relationship: RelationshipProperty = None):
-        self.cls = cls
+    def __init__(self, obj: Any, dao: Type, relationship: RelationshipProperty = None):
+        self.obj = obj
         self.dao = dao
         self.relationship = relationship
-        TypeError.__init__(self, f"Class {cls} does not have a DAO. This happened when trying"
-                         f"to create a dao for {dao}) on the relationship {relationship}.")
-
-
+        TypeError.__init__(self, f"Class {type(obj)} does not have a DAO. This happened when trying"
+                                 f"to create a dao for {dao}) on the relationship {relationship} with the "
+                                 f"relationship value {obj}."
+                                 f"Expected a relationship value of type {relationship.target}.")
 
 
 def is_data_column(column: Column):
@@ -257,7 +257,7 @@ class DataAccessObject(HasGeneric[T]):
                 else:
                     dao_class = get_dao_class(type(value_in_obj))
                     if dao_class is None:
-                        raise NoDAOFoundDuringParsingError(type(value_in_obj), type(self), relationship)
+                        raise NoDAOFoundDuringParsingError(value_in_obj, type(self), relationship)
                     dao_of_value = dao_class.to_dao(value_in_obj, memo=memo)
 
                 setattr(self, relationship.key, dao_of_value)
