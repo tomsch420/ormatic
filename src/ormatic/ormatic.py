@@ -333,10 +333,11 @@ class WrappedTable:
             self.create_custom_type(field_info)
 
         elif field_info.container:
-            logger.info(f"Parsing as one to many relationship.")
             if field_info.is_container_of_builtin:
+                logger.info(f"Parsing as JSON.")
                 self.create_container_of_builtins(field_info)
             elif field_info.type in self.ormatic.class_dict:
+                logger.info(f"Parsing as one to many relationship.")
                 self.create_one_to_many_relationship(field_info)
         else:
             logger.info("Skipping due to not handled type.")
@@ -392,7 +393,8 @@ class WrappedTable:
 
     def create_container_of_builtins(self, field_info: FieldInfo):
         column_name = field_info.name
-        column_type = f"Mapped[{str(field_info.field.type)}]"
+        container = "Set" if issubclass(field_info.container, set) else "List"
+        column_type = f"Mapped[{container}[{field_info.type.__name__}]]"
         column_constructor = f"mapped_column(JSON, nullable={field_info.optional})"
         self.custom_columns.append((column_name, column_type, column_constructor))
 

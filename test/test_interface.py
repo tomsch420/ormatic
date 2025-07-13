@@ -293,7 +293,7 @@ class InterfaceTestCase(unittest.TestCase):
 
     def test_entity_association(self):
         entity = Entity("TestEntity")
-        association = EntityAssociation(entity=entity)
+        association = EntityAssociation(entity=entity, a=["a"])
 
         association_dao = to_dao(association)
 
@@ -304,7 +304,6 @@ class InterfaceTestCase(unittest.TestCase):
         self.session.commit()
 
         queried_association = self.session.scalars(select(EntityAssociationDAO)).one()
-
         self.assertEqual(queried_association.entity.overwritten_name, entity.name)
         reconstructed = queried_association.from_dao()
         self.assertEqual(reconstructed, association)

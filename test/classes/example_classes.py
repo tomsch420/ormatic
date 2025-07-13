@@ -4,7 +4,7 @@ import importlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any
+from typing import Dict, Any, Sequence
 
 from sqlalchemy import types, TypeDecorator
 from typing_extensions import List, Optional, Type
@@ -154,6 +154,7 @@ class EntityAssociation:
     Class for checking how classes that are explicitly mapped interact with original types.
     """
     entity: Entity
+    a: Sequence[str] = None
 
 # Define an explicit mapping DAO that maps to the base entity class
 @dataclass

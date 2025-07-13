@@ -83,6 +83,7 @@ class EntityAssociationDAO(Base, DataAccessObject[classes.example_classes.Entity
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
+    a: Mapped[List[str]] = mapped_column(JSON, nullable=False)
 
     entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id'), nullable=False)
 
