@@ -105,7 +105,6 @@ class ORMatic:
         """
         Create a direct acyclic graph containing the class hierarchy.
         """
-        # TODO map stuff differently thats already a subclass of DAO
         self.class_dependency_graph = rx.PyDAG()
 
         for clazz, wrapped_table in self.class_dict.items():
@@ -144,15 +143,6 @@ class ORMatic:
     def make_all_tables(self):
         for table in self.wrapped_tables:
             table.parse_fields()
-
-    def parse_classes(self):
-        """
-        Parse all the classes in the class_dict, aggregating the columns, primary keys, foreign keys and relationships.
-        """
-        # Parse classes in the original class_dict
-        for wrapped_table in self.class_dict.values():
-            # Parse all classes, including those that implement ORMaticExplicitMapping
-            self.parse_class(wrapped_table)
 
     def foreign_key_name(self, field_info: FieldInfo):
         """
@@ -263,7 +253,6 @@ class WrappedTable:
 
     @cached_property
     def tablename(self):
-        # TODO check if DAO
         result = self.clazz.__name__
         result += "DAO"
         return result
