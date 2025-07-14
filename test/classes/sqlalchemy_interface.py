@@ -85,7 +85,7 @@ class EntityAssociationDAO(Base, DataAccessObject[classes.example_classes.Entity
 
     a: Mapped[List[str]] = mapped_column(JSON, nullable=False)
 
-    entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id'), nullable=False)
+    entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id'), nullable=False, post_update=True)
 
     entity: Mapped[CustomEntityDAO] = relationship('CustomEntityDAO', uselist=False, foreign_keys=[entity_id])
 
@@ -114,7 +114,7 @@ class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
 
 
 
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'), nullable=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'), nullable=True, post_update=True)
 
     parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id])
 
@@ -152,8 +152,8 @@ class PoseDAO(Base, DataAccessObject[classes.example_classes.Pose]):
 
 
 
-    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), nullable=False)
-    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'), nullable=False)
+    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), nullable=False, post_update=True)
+    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'), nullable=False, post_update=True)
 
     position: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[position_id])
     orientation: Mapped[OrientationDAO] = relationship('OrientationDAO', uselist=False, foreign_keys=[orientation_id])
