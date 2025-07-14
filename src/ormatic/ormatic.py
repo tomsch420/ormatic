@@ -355,7 +355,9 @@ class WrappedTable:
         # create foreign key
         fk_name = f"{field_info.name}{self.ormatic.foreign_key_postfix}"
         fk_type = f"Mapped[Optional[int]]" if field_info.optional else "Mapped[int]"
-        fk_column_constructor = f"mapped_column(ForeignKey('{self.ormatic.class_dict[field_info.type].full_primary_key_name}'), nullable={field_info.optional}, post_update=True)"
+
+        # columns have to be nullable and use_alter=True since the insertion order might be incorrect otherwise
+        fk_column_constructor = f"mapped_column(ForeignKey('{self.ormatic.class_dict[field_info.type].full_primary_key_name}', use_alter=True), nullable=True)"
 
         self.foreign_keys.append((fk_name, fk_type, fk_column_constructor))
 
@@ -363,7 +365,8 @@ class WrappedTable:
         other_table = self.ormatic.class_dict[field_info.type]
         rel_name = f"{field_info.name}"
         rel_type = f"Mapped[{other_table.tablename}]"
-        rel_constructor = f"relationship('{other_table.tablename}', uselist=False, foreign_keys=[{fk_name}])"
+        # relationships have to be post updated since since it won't work in the case of subclasses with another ref otherwise
+        rel_constructor = f"relationship('{other_table.tablename}', uselist=False, foreign_keys=[{fk_name}], post_update=True)"
         self.relationships.append((rel_name, rel_type, rel_constructor))
 
     def create_one_to_many_relationship(self, field_info: FieldInfo):

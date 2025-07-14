@@ -51,6 +51,10 @@ class Positions:
     positions: List[Position]
     some_strings: List[str]
 
+@dataclass
+class PositionsSubclassWithAnotherPosition(Positions):
+    positions2: Position
+
 # check that one to many relationships work where the many side is of the same type
 @dataclass
 class DoublePositionAggregator:
@@ -168,6 +172,9 @@ class CustomEntity(AlternativeMapping[Entity]):
 
     def create_from_dao(self) -> T:
         return Entity(name=self.overwritten_name)
+
+
+
 
 class ConceptType(TypeDecorator):
     """

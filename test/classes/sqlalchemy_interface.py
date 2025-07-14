@@ -85,9 +85,9 @@ class EntityAssociationDAO(Base, DataAccessObject[classes.example_classes.Entity
 
     a: Mapped[List[str]] = mapped_column(JSON, nullable=False)
 
-    entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id'), nullable=False, post_update=True)
+    entity_id: Mapped[int] = mapped_column(ForeignKey('CustomEntityDAO.id', use_alter=True), nullable=True)
 
-    entity: Mapped[CustomEntityDAO] = relationship('CustomEntityDAO', uselist=False, foreign_keys=[entity_id])
+    entity: Mapped[CustomEntityDAO] = relationship('CustomEntityDAO', uselist=False, foreign_keys=[entity_id], post_update=True)
 
 
 class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.KinematicChain]):
@@ -114,9 +114,9 @@ class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
 
 
 
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id'), nullable=True, post_update=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id', use_alter=True), nullable=True)
 
-    parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id])
+    parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id], post_update=True)
 
 
 class OrientationDAO(Base, DataAccessObject[classes.example_classes.Orientation]):
@@ -152,11 +152,11 @@ class PoseDAO(Base, DataAccessObject[classes.example_classes.Pose]):
 
 
 
-    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id'), nullable=False, post_update=True)
-    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id'), nullable=False, post_update=True)
+    position_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id', use_alter=True), nullable=True)
+    orientation_id: Mapped[int] = mapped_column(ForeignKey('OrientationDAO.id', use_alter=True), nullable=True)
 
-    position: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[position_id])
-    orientation: Mapped[OrientationDAO] = relationship('OrientationDAO', uselist=False, foreign_keys=[orientation_id])
+    position: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[position_id], post_update=True)
+    orientation: Mapped[OrientationDAO] = relationship('OrientationDAO', uselist=False, foreign_keys=[orientation_id], post_update=True)
 
 
 class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
@@ -196,12 +196,17 @@ class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
+    polymorphic_type: Mapped[str]
 
     some_strings: Mapped[List[str]] = mapped_column(JSON, nullable=False)
 
 
     positions: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.positionsdao_positions_id]')
 
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'PositionsDAO',
+    }
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):
     __tablename__ = 'ChildMappedDAO'
@@ -261,5 +266,21 @@ class Position4DDAO(PositionDAO, DataAccessObject[classes.example_classes.Positi
     __mapper_args__ = {
         'polymorphic_identity': 'Position4DDAO',
         'inherit_condition': id == PositionDAO.id,
+    }
+
+class PositionsSubclassWithAnotherPositionDAO(PositionsDAO, DataAccessObject[classes.example_classes.PositionsSubclassWithAnotherPosition]):
+    __tablename__ = 'PositionsSubclassWithAnotherPositionDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(PositionsDAO.id), primary_key=True)
+
+
+
+    positions2_id: Mapped[int] = mapped_column(ForeignKey('PositionDAO.id', use_alter=True), nullable=True)
+
+    positions2: Mapped[PositionDAO] = relationship('PositionDAO', uselist=False, foreign_keys=[positions2_id], post_update=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'PositionsSubclassWithAnotherPositionDAO',
+        'inherit_condition': id == PositionsDAO.id,
     }
 

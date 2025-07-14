@@ -28,7 +28,7 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl, Torso}
         all_classes = {Position, Position4D, Atom, Orientation, Pose, Positions, DoublePositionAggregator,
                        PositionTypeWrapper, Parent, ChildMapped, Node, DerivedEntity, KinematicChain, Torso,
-                       OriginalSimulatedObject, CustomEntity, EntityAssociation}
+                       OriginalSimulatedObject, CustomEntity, EntityAssociation, PositionsSubclassWithAnotherPosition}
 
         cls.ormatic_instance = ORMatic(list(sorted(all_classes, key=lambda c: c.__name__)),
                                        {PhysicalObject: ConceptType, })

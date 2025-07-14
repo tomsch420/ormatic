@@ -312,6 +312,13 @@ class InterfaceTestCase(unittest.TestCase):
         p = Pose([1,2,3], "a")
         self.assertRaises(NoDAOFoundDuringParsingError, to_dao, p)
 
+    def test_PositionsSubclassWithAnotherPosition(self):
+        position = Position(1, 2, 3)
+        obj = PositionsSubclassWithAnotherPosition([position], ["a","b", "c"], position)
+        dao: PositionsSubclassWithAnotherPositionDAO = to_dao(obj)
+        print(dao.positions2)
+        self.session.add(dao)
+        self.session.commit()
 
 if __name__ == '__main__':
     unittest.main()
