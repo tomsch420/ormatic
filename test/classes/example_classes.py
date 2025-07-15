@@ -17,10 +17,12 @@ class Element(Enum):
     C = "c"
     H = "h"
 
+
 # Check that Types attributes work
 @dataclass
 class PositionTypeWrapper:
     position_type: Type[Position]
+
 
 # check that flat classes work
 @dataclass
@@ -28,6 +30,7 @@ class Position:
     x: float
     y: float
     z: float
+
 
 # check that classes with optional values work
 @dataclass
@@ -51,9 +54,11 @@ class Positions:
     positions: List[Position]
     some_strings: List[str]
 
+
 @dataclass
 class PositionsSubclassWithAnotherPosition(Positions):
     positions2: Position
+
 
 # check that one to many relationships work where the many side is of the same type
 @dataclass
@@ -61,10 +66,17 @@ class DoublePositionAggregator:
     positions1: List[Position]
     positions2: List[Position]
 
+
 # check that inheritance works
 @dataclass
 class Position4D(Position):
     w: float
+
+
+# check that inheriting from an inherited class works
+@dataclass
+class Position5D(Position4D):
+    v: float
 
 
 # check with tree like classes
@@ -72,8 +84,10 @@ class Position4D(Position):
 class Node:
     parent: Optional[Node] = None
 
+
 class NotMappedParent:
     ...
+
 
 # check that enum references work
 @dataclass
@@ -82,6 +96,7 @@ class Atom(NotMappedParent):
     type: int
     charge: float
     timestamp: datetime = field(default_factory=datetime.now)
+
 
 # check that custom type checks work
 class PhysicalObject:
@@ -113,9 +128,11 @@ class ObjectAnnotation:
     """
     object_reference: OriginalSimulatedObject
 
+
 @dataclass
 class KinematicChain:
     name: str
+
 
 @dataclass
 class Torso(KinematicChain):
@@ -127,13 +144,16 @@ class Torso(KinematicChain):
     A collection of kinematic chains that are connected to the torso.
     """
 
+
 @dataclass
 class Parent:
     name: str
 
+
 @dataclass
 class ChildMapped(Parent):
     attribute1: int
+
 
 @dataclass
 class ChildNotMapped(Parent):
@@ -152,6 +172,7 @@ class Entity:
 class DerivedEntity(Entity):
     description: str = "Default description"
 
+
 @dataclass
 class EntityAssociation:
     """
@@ -159,6 +180,7 @@ class EntityAssociation:
     """
     entity: Entity
     a: Sequence[str] = None
+
 
 # Define an explicit mapping DAO that maps to the base entity class
 @dataclass
@@ -172,8 +194,6 @@ class CustomEntity(AlternativeMapping[Entity]):
 
     def create_from_dao(self) -> T:
         return Entity(name=self.overwritten_name)
-
-
 
 
 class ConceptType(TypeDecorator):
