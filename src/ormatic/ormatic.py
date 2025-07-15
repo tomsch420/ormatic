@@ -213,6 +213,11 @@ class WrappedTable:
     The index of self in `self.ormatic.class_dependency_graph`. 
     """
 
+    skip_fields: List[Field] = field(default_factory=list)
+    """
+    A list of fields that should be skipped when processing the dataclass.
+    """
+
     def __post_init__(self):
         if not is_dataclass(self.clazz):
             raise TypeError(f"ORMatic can only process dataclasses. Got {self.clazz} which is not a dataclass.")
@@ -266,14 +271,12 @@ class WrappedTable:
 
     @cached_property
     def fields(self) -> List[Field]:
-        # collect parent fields TODO check the desired fields from parent classes
-
-        skip_fields = []
+        self.skip_fields = []
 
         if self.parent_table is not None:
-            skip_fields.extend(self.parent_table.fields)
+            self.skip_fields += self.parent_table.skip_fields + self.parent_table.fields
 
-        result = [field for field in fields(self.clazz) if field not in skip_fields]
+        result = [field for field in fields(self.clazz) if field not in self.skip_fields]
 
         if self.parent_table is not None:
             if issubclass(self.parent_table.clazz, AlternativeMapping):

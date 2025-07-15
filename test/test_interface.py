@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, configure_mappers
 
 from classes.example_classes import *
 from classes.sqlalchemy_interface import *
-from ormatic.dao import to_dao, NoDAOFoundDuringParsingError
+from ormatic.dao import to_dao, NoDAOFoundDuringParsingError, is_data_column
 
 
 class InterfaceTestCase(unittest.TestCase):
@@ -158,7 +158,6 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(derived.name, derived_reconstructed.name)
         self.assertEqual(derived.description, derived_reconstructed.description)
 
-    #
     def test_parent_and_child(self):
         parent = Parent("TestParent")
         child_mapped = ChildMapped("ChildMapped", 42)
@@ -216,7 +215,6 @@ class InterfaceTestCase(unittest.TestCase):
         result = self.session.scalars(select(PositionTypeWrapperDAO)).one()
         self.assertEqual(result, dao)
 
-    #
     def test_positions(self):
         p1 = Position(1, 2, 3)
         p2 = Position(2, 3, 4)
@@ -276,7 +274,6 @@ class InterfaceTestCase(unittest.TestCase):
     def test_inheriting_from_explicit_mapping(self):
         entity: DerivedEntity = DerivedEntity(name="TestEntity")
 
-        # entity association, hat entity vom typ
         entity_dao = DerivedEntityDAO.to_dao(entity)
         self.assertIsInstance(entity_dao, DerivedEntityDAO)
         self.session.add(entity_dao)
@@ -316,9 +313,33 @@ class InterfaceTestCase(unittest.TestCase):
         position = Position(1, 2, 3)
         obj = PositionsSubclassWithAnotherPosition([position], ["a","b", "c"], position)
         dao: PositionsSubclassWithAnotherPositionDAO = to_dao(obj)
-        print(dao.positions2)
+
         self.session.add(dao)
         self.session.commit()
+
+    def test_inheriting_from_inherited_class(self):
+        position_5d = Position5D(1, 2, 3, 4, 5)
+        position_4d = Position4D(1, 2, 3, 4)
+
+        position_4d_dao = to_dao(position_4d)
+        position_5d_dao = to_dao(position_5d)
+
+        self.session.add(position_4d_dao)
+        self.session.commit()
+
+        self.session.add(position_5d_dao)
+        self.session.commit()
+
+        queried_position_5d = self.session.scalars(select(Position5DDAO)).one()
+        queried_position_4d = self.session.scalars(select(Position4DDAO)).all()
+        queried_position = self.session.scalars(select(PositionDAO)).all()
+        columns = [column for column in queried_position_5d.__table__.columns if is_data_column(column)]
+        self.assertTrue(queried_position_5d in queried_position_4d)
+        self.assertTrue(queried_position_5d in queried_position)
+        self.assertTrue(queried_position_4d[0] in queried_position)
+        self.assertEqual(len(columns), 1) #w column
+
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -284,3 +284,18 @@ class PositionsSubclassWithAnotherPositionDAO(PositionsDAO, DataAccessObject[cla
         'inherit_condition': id == PositionsDAO.id,
     }
 
+class Position5DDAO(Position4DDAO, DataAccessObject[classes.example_classes.Position5D]):
+    __tablename__ = 'Position5DDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(Position4DDAO.id), primary_key=True)
+
+    v: Mapped[float]
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'Position5DDAO',
+        'inherit_condition': id == Position4DDAO.id,
+    }
+

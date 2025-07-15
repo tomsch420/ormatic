@@ -26,7 +26,7 @@ class SQLAlchemyGenerationTestCase(unittest.TestCase):
         all_classes -= set(recursive_subclasses(DataAccessObject))
         all_classes -= set(recursive_subclasses(Enum))
         all_classes -= {ChildNotMapped, PhysicalObject, Cup, Bowl, Torso}
-        all_classes = {Position, Position4D, Atom, Orientation, Pose, Positions, DoublePositionAggregator,
+        all_classes = {Position, Position4D, Position5D, Atom, Orientation, Pose, Positions, DoublePositionAggregator,
                        PositionTypeWrapper, Parent, ChildMapped, Node, DerivedEntity, KinematicChain, Torso,
                        OriginalSimulatedObject, CustomEntity, EntityAssociation, PositionsSubclassWithAnotherPosition}
 
