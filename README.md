@@ -1,5 +1,3 @@
-from dataclasses import is_dataclass
-
 # Welcome to ORMatic
 
 ORMatic is a python package that automatically converts python dataclasses to sqlalchemy tables.
