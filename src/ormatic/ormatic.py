@@ -377,13 +377,13 @@ class WrappedTable:
         other_table = self.ormatic.class_dict[field_info.type]
         fk_name = f"{self.tablename.lower()}_{field_info.name}{self.ormatic.foreign_key_postfix}"
         fk_type = "Mapped[Optional[int]]"
-        fk_column_constructor = f"mapped_column(ForeignKey('{self.full_primary_key_name}'))"
+        fk_column_constructor = f"mapped_column(ForeignKey('{self.full_primary_key_name}', use_alter=True), nullable=True)"
         other_table.foreign_keys.append((fk_name, fk_type, fk_column_constructor))
 
         # create a relationship with a list to collect the other side
         rel_name = f"{field_info.name}"
         rel_type = f"Mapped[List[{other_table.tablename}]]"
-        rel_constructor = f"relationship('{other_table.tablename}', foreign_keys='[{other_table.tablename}.{fk_name}]')"
+        rel_constructor = f"relationship('{other_table.tablename}', foreign_keys='[{other_table.tablename}.{fk_name}]', post_update=True)"
         self.relationships.append((rel_name, rel_type, rel_constructor))
 
     def create_container_of_builtins(self, field_info: FieldInfo):

@@ -69,5 +69,4 @@ if __name__ == '__main__':
 ```
 
 # TODO List
-- Fields that are typed as Sequence/Iterable should be stored as list
-- Check deep inheritance
+- ~~Nothing~~
