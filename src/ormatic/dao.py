@@ -132,23 +132,30 @@ class DataAccessObject(HasGeneric[T]):
         # check if the obj has been converted to a dao already
         if memo is None:
             memo = {}
+
         if id(obj) in memo:
             return memo[id(obj)]
 
         # apply alternative mapping if needed
         if issubclass(cls.original_class(), AlternativeMapping):
-            obj = cls.original_class().to_dao(obj, memo=memo, )
+            obj = cls.original_class().to_dao(obj, memo=memo)
 
         # get the primary inheritance route
         base = cls.__bases__[0]
         result = cls()
 
+        # register the result as in process
+        if register:
+            memo[id(obj)] = result
+
         # if the superclass of this dao is a DAO for an alternative mapping
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
             result.to_dao_if_subclass_of_alternative_mapping(obj=obj, memo=memo, base=base)
+
         else:
             result.to_dao_default(obj=obj, memo=memo)
 
+        # Update the memo with the fully converted object
         if register:
             memo[id(obj)] = result
         return result
@@ -184,8 +191,18 @@ class DataAccessObject(HasGeneric[T]):
                  and relationship data from the source object.
         """
 
+        # Temporarily remove the object from the memo dictionary to allow the parent DAO to be created
+        temp_dao = None
+        if id(obj) in memo:
+            temp_dao = memo[id(obj)]
+            del memo[id(obj)]
+
         # create dao of alternatively mapped superclass
         parent_dao = base.original_class().to_dao(obj, memo=memo)
+
+        # Restore the object in the memo dictionary
+        if temp_dao is not None:
+            memo[id(obj)] = temp_dao
 
         # Fill super class columns
         parent_mapper = sqlalchemy.inspection.inspect(base)

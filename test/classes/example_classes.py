@@ -223,7 +223,7 @@ class Reference:
 @dataclass
 class Backreference:
     unmappable: Dict[Any, int]
-    reference: Optional[Reference] = None
+    reference: Reference = None
 
 @dataclass
 class BackreferenceMapping(AlternativeMapping[Backreference]):
