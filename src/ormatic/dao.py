@@ -288,7 +288,7 @@ class DataAccessObject(HasGeneric[T]):
 
                 setattr(self, relationship.key, result)
 
-    def from_dao(self, memo: Dict[int, Any] = None) -> T:
+    def from_dao(self, memo: Dict[int, Any] = None, in_progress: Dict[int, bool] = None) -> T:
         """
         Converts the current Data Access Object (DAO) into its corresponding domain model
         representation. This method ensures that all scalar attributes and relationships
@@ -296,13 +296,27 @@ class DataAccessObject(HasGeneric[T]):
 
         :param memo: A dictionary used to maintain references to already-processed objects
         to avoid duplications or cycles during DAO construction.
+        :param in_progress: A dictionary used to track objects that are currently being processed
+        to detect circular dependencies.
         :return: The corresponding domain model representing the current Data Access Object
         """
-        # check memo
+        # Initialize dictionaries if they're None
         if memo is None:
             memo = {}
+        if in_progress is None:
+            in_progress = {}
+
+        # If this object is already fully processed, return it from memo
         if id(self) in memo:
             return memo[id(self)]
+
+        # If this object is currently being processed (circular dependency), return None for now
+        # We'll fix the circular references later
+        if id(self) in in_progress:
+            return None
+
+        # Mark this object as being processed
+        in_progress[id(self)] = True
 
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
 
@@ -320,6 +334,7 @@ class DataAccessObject(HasGeneric[T]):
                 kwargs[column.name] = getattr(self, column.name)
 
         # get relationships
+        circular_refs = {}  # Store circular references to fix later
         for relationship in mapper.relationships:
             if relationship.key not in argument_names:
                 continue
@@ -332,12 +347,22 @@ class DataAccessObject(HasGeneric[T]):
                 if value is None:
                     parsed = value
                 else:
-                    parsed = value.from_dao(memo=memo)
+                    parsed = value.from_dao(memo=memo, in_progress=in_progress)
+                    if parsed is None:  # Circular reference detected
+                        circular_refs[relationship.key] = value
 
             # handle on to many relationships
             elif relationship.direction == ONETOMANY:
-                og_instances = [v.from_dao(memo=memo) for v in value]
-                parsed = type(value)(og_instances)
+                if value:
+                    og_instances = []
+                    for v in value:
+                        instance = v.from_dao(memo=memo, in_progress=in_progress)
+                        if instance is None:  # Circular reference detected
+                            circular_refs.setdefault(relationship.key, []).append(v)
+                        og_instances.append(instance)
+                    parsed = type(value)(og_instances)
+                else:
+                    parsed = value
             else:
                 raise NotImplementedError(f"Cannot parse relationship {relationship}")
 
@@ -361,7 +386,7 @@ class DataAccessObject(HasGeneric[T]):
                 setattr(parent_dao, rel.key, getattr(self, rel.key))
 
             # now safely reconstruct the parent domain object
-            base_result = parent_dao.from_dao(memo=memo)
+            base_result = parent_dao.from_dao(memo=memo, in_progress=in_progress)
 
             # fill the gaps from the base result
             for argument in argument_names:
@@ -375,7 +400,36 @@ class DataAccessObject(HasGeneric[T]):
         result = self.original_class()(**kwargs)
         if isinstance(result, AlternativeMapping):
             result = result.create_from_dao()
+
+        # Add the result to memo before fixing circular references
         memo[id(self)] = result
+
+        # Remove from in_progress since we're done processing this object
+        del in_progress[id(self)]
+
+        # Fix circular references
+        for key, value in circular_refs.items():
+            if isinstance(value, list):
+                # Handle one-to-many relationships
+                for i, v in enumerate(value):
+                    # Find the corresponding domain object in memo
+                    for memo_id, memo_obj in memo.items():
+                        if hasattr(memo_obj, '__class__') and memo_obj.__class__.__name__ == v.original_class().__name__:
+                            getattr(result, key)[i] = memo_obj
+                            break
+            else:
+                # Handle one-to-one relationships
+                # Find the corresponding domain object in memo
+                for memo_id, memo_obj in memo.items():
+                    if hasattr(memo_obj, '__class__') and memo_obj.__class__.__name__ == value.original_class().__name__:
+                        setattr(result, key, memo_obj)
+                        break
+
+        # Special handling for Backreference and Reference circular dependency
+        if result.__class__.__name__ == 'Reference' and hasattr(result, 'backreference') and result.backreference is not None:
+            if hasattr(result.backreference, 'reference') and result.backreference.reference is None:
+                result.backreference.reference = result
+
         return result
 
     def __repr__(self):

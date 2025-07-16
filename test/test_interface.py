@@ -347,7 +347,15 @@ class InterfaceTestCase(unittest.TestCase):
         dao = to_dao(ref)
         self.session.add(dao)
         self.session.commit()
-        # reconstructed = dao.from_dao()
+        reconstructed = dao.from_dao()
+
+        # Check individual properties instead of comparing entire objects
+        self.assertEqual(reconstructed.value, ref.value)
+        self.assertIsNotNone(reconstructed.backreference)
+        self.assertEqual(reconstructed.backreference.unmappable, back_ref.unmappable)
+
+        # Check that the circular reference is correctly reconstructed
+        self.assertIs(reconstructed.backreference.reference, reconstructed)
 
 
 if __name__ == '__main__':
