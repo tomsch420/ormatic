@@ -233,3 +233,6 @@ class BackreferenceMapping(AlternativeMapping[Backreference]):
     @classmethod
     def create_instance(cls, obj: T):
         return cls(list(obj.unmappable.values()), obj.reference)
+
+    def create_from_dao(self) -> T:
+        return Backreference({v:v for v in self.values}, self.reference)

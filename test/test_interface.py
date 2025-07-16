@@ -340,12 +340,14 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(len(columns), 1) #w column
 
     def test_backreference_with_mapping(self):
-        back_ref = Backreference({0:1})
+        back_ref = Backreference({1:1})
         ref = Reference(0, back_ref)
         back_ref.reference = ref
 
         dao = to_dao(ref)
         self.session.add(dao)
+        self.session.commit()
+        # reconstructed = dao.from_dao()
 
 
 if __name__ == '__main__':
