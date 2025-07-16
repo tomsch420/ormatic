@@ -33,6 +33,19 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
 
 
 
+class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.BackreferenceMapping]):
+    __tablename__ = 'BackreferenceMappingDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+    values: Mapped[List[int]] = mapped_column(JSON, nullable=False)
+
+    reference_id: Mapped[int] = mapped_column(ForeignKey('ReferenceDAO.id', use_alter=True), nullable=True)
+
+    reference: Mapped[ReferenceDAO] = relationship('ReferenceDAO', uselist=False, foreign_keys=[reference_id], post_update=True)
+
+
 class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
     __tablename__ = 'ParentDAO'
 
@@ -207,6 +220,19 @@ class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'PositionsDAO',
     }
+
+class ReferenceDAO(Base, DataAccessObject[classes.example_classes.Reference]):
+    __tablename__ = 'ReferenceDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    value: Mapped[int]
+
+
+    backreference_id: Mapped[Optional[int]] = mapped_column(ForeignKey('BackreferenceMappingDAO.id', use_alter=True), nullable=True)
+
+    backreference: Mapped[BackreferenceMappingDAO] = relationship('BackreferenceMappingDAO', uselist=False, foreign_keys=[backreference_id], post_update=True)
+
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):
     __tablename__ = 'ChildMappedDAO'

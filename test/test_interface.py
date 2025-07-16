@@ -339,6 +339,13 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertTrue(queried_position_4d[0] in queried_position)
         self.assertEqual(len(columns), 1) #w column
 
+    def test_backreference_with_mapping(self):
+        back_ref = Backreference({0:1})
+        ref = Reference(0, back_ref)
+        back_ref.reference = ref
+
+        dao = to_dao(ref)
+        self.session.add(dao)
 
 
 if __name__ == '__main__':

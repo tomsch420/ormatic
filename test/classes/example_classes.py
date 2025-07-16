@@ -213,3 +213,23 @@ class ConceptType(TypeDecorator):
         module_name, class_name = str(value).rsplit('.', 1)
         module = importlib.import_module(module_name)
         return getattr(module, class_name)()
+
+
+@dataclass
+class Reference:
+    value: int = 0
+    backreference: Optional[Backreference] = None
+
+@dataclass
+class Backreference:
+    unmappable: Dict[Any, int]
+    reference: Optional[Reference] = None
+
+@dataclass
+class BackreferenceMapping(AlternativeMapping[Backreference]):
+    values: List[int]
+    reference: Reference
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return cls(list(obj.unmappable.values()), obj.reference)
