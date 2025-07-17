@@ -467,7 +467,15 @@ class AlternativeMapping(HasGeneric[T]):
             return memo[id(obj)]
         else:
             result = cls.create_instance(obj)
-            memo[id(obj)] = result
+            # Get the DAO for this object
+            dao_class = get_dao_class(type(obj))
+            if dao_class is not None:
+                # Store the DAO in the memo dict, not the mapped object
+                dao_instance = dao_class()
+                memo[id(obj)] = dao_instance
+            else:
+                # If no DAO class is found, store the mapped object
+                memo[id(obj)] = result
             return result
 
     @classmethod

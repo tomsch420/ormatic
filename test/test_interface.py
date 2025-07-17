@@ -364,6 +364,11 @@ class InterfaceTestCase(unittest.TestCase):
 
         ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
         dao = to_dao(ama)
+        self.session.add(dao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(AlternativeMappingAggregatorDAO)).one()
+        print(queried)
 
 
     @unittest.skip("Prüser Time")
