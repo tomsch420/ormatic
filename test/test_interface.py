@@ -357,6 +357,29 @@ class InterfaceTestCase(unittest.TestCase):
         # Check that the circular reference is correctly reconstructed
         self.assertIs(reconstructed.backreference.reference, reconstructed)
 
+    def test_backreference_aggregator(self):
+        back_ref_1 = Backreference({1:1})
+        back_ref_2 = Backreference({2:2})
+        aggregator = BackreferenceAggregator([back_ref_1, back_ref_2])
+        dao = to_dao(aggregator)
+
+    def test_container_item(self):
+        i1 = ItemWithBackreference(0)
+        i2 = ItemWithBackreference(1)
+        container = Container([i1, i2])
+
+        dao = to_dao(container)
+        self.session.add(dao)
+        self.session.commit()
+
+        queried_items = self.session.scalars(select(ItemWithBackreferenceDAO)).all()
+        self.assertEqual(len(queried_items), 2)
+
+        queried_container = self.session.scalar(select(ContainerDAO))
+        self.assertIs(queried_container, queried_items[0].container)
+
+        reconstructed_item = queried_items[0].from_dao()
+
 
 if __name__ == '__main__':
     unittest.main()

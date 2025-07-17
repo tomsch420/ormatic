@@ -33,6 +33,17 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
 
 
 
+class BackreferenceAggregatorDAO(Base, DataAccessObject[classes.example_classes.BackreferenceAggregator]):
+    __tablename__ = 'BackreferenceAggregatorDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    backreferences: Mapped[List[BackreferenceMappingDAO]] = relationship('BackreferenceMappingDAO', foreign_keys='[BackreferenceMappingDAO.backreferenceaggregatordao_backreferences_id]', post_update=True)
+
+
 class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.BackreferenceMapping]):
     __tablename__ = 'BackreferenceMappingDAO'
 
@@ -41,6 +52,7 @@ class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.Bac
 
     values: Mapped[List[int]] = mapped_column(JSON, nullable=False)
 
+    backreferenceaggregatordao_backreferences_id: Mapped[Optional[int]] = mapped_column(ForeignKey('BackreferenceAggregatorDAO.id', use_alter=True), nullable=True)
     reference_id: Mapped[int] = mapped_column(ForeignKey('ReferenceDAO.id', use_alter=True), nullable=True)
 
     reference: Mapped[ReferenceDAO] = relationship('ReferenceDAO', uselist=False, foreign_keys=[reference_id], post_update=True)
@@ -61,6 +73,17 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'ParentDAO',
     }
+
+class ContainerDAO(Base, DataAccessObject[classes.example_classes.Container]):
+    __tablename__ = 'ContainerDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    items: Mapped[List[ItemWithBackreferenceDAO]] = relationship('ItemWithBackreferenceDAO', foreign_keys='[ItemWithBackreferenceDAO.containerdao_items_id]', post_update=True)
+
 
 class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntity]):
     __tablename__ = 'CustomEntityDAO'
@@ -103,6 +126,20 @@ class EntityAssociationDAO(Base, DataAccessObject[classes.example_classes.Entity
     entity: Mapped[CustomEntityDAO] = relationship('CustomEntityDAO', uselist=False, foreign_keys=[entity_id], post_update=True)
 
 
+class ItemWithBackreferenceDAO(Base, DataAccessObject[classes.example_classes.ItemWithBackreference]):
+    __tablename__ = 'ItemWithBackreferenceDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    value: Mapped[int]
+
+
+    containerdao_items_id: Mapped[Optional[int]] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
+    container_id: Mapped[int] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
+
+    container: Mapped[ContainerDAO] = relationship('ContainerDAO', uselist=False, foreign_keys=[container_id], post_update=True)
+
+
 class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.KinematicChain]):
     __tablename__ = 'KinematicChainDAO'
 
@@ -130,6 +167,18 @@ class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey('NodeDAO.id', use_alter=True), nullable=True)
 
     parent: Mapped[NodeDAO] = relationship('NodeDAO', uselist=False, foreign_keys=[parent_id], post_update=True)
+
+
+class ObjectAnnotationDAO(Base, DataAccessObject[classes.example_classes.ObjectAnnotation]):
+    __tablename__ = 'ObjectAnnotationDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+    object_reference_id: Mapped[int] = mapped_column(ForeignKey('OriginalSimulatedObjectDAO.id', use_alter=True), nullable=True)
+
+    object_reference: Mapped[OriginalSimulatedObjectDAO] = relationship('OriginalSimulatedObjectDAO', uselist=False, foreign_keys=[object_reference_id], post_update=True)
 
 
 class OrientationDAO(Base, DataAccessObject[classes.example_classes.Orientation]):
