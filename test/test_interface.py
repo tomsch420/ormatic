@@ -365,11 +365,14 @@ class InterfaceTestCase(unittest.TestCase):
         ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
         dao: AlternativeMappingAggregatorDAO = to_dao(ama)
 
+        self.assertIs(dao.entities1[1], dao.entities2[0])
+
         self.session.add(dao)
         self.session.commit()
 
         queried = self.session.scalars(select(AlternativeMappingAggregatorDAO)).one()
-        print(queried)
+        reconstructed = queried.from_dao()
+        self.assertIs(reconstructed.entities1[1], reconstructed.entities2[0])
 
 
     @unittest.skip("Prüser Time")

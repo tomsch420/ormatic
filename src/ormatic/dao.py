@@ -133,6 +133,7 @@ class DataAccessObject(HasGeneric[T]):
         if memo is None:
             memo = {}
 
+        original_obj_id = id(obj)
         if id(obj) in memo:
             return memo[id(obj)]
 
@@ -147,17 +148,14 @@ class DataAccessObject(HasGeneric[T]):
         # register the result as in process
         if register:
             memo[id(obj)] = result
+            memo[original_obj_id] = result
 
         # if the superclass of this dao is a DAO for an alternative mapping
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
             result.to_dao_if_subclass_of_alternative_mapping(obj=obj, memo=memo, base=base)
-
         else:
             result.to_dao_default(obj=obj, memo=memo)
 
-        # Update the memo with the fully converted object
-        if register:
-            memo[id(obj)] = result
         return result
 
     def to_dao_default(self, obj: T, memo: Dict[int, Any]):
