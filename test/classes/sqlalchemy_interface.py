@@ -19,6 +19,18 @@ class Base(DeclarativeBase):
     }
 
 
+class AlternativeMappingAggregatorDAO(Base, DataAccessObject[classes.example_classes.AlternativeMappingAggregator]):
+    __tablename__ = 'AlternativeMappingAggregatorDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    entities1: Mapped[List[CustomEntityDAO]] = relationship('CustomEntityDAO', foreign_keys='[CustomEntityDAO.alternativemappingaggregatordao_entities1_id]', post_update=True)
+    entities2: Mapped[List[CustomEntityDAO]] = relationship('CustomEntityDAO', foreign_keys='[CustomEntityDAO.alternativemappingaggregatordao_entities2_id]', post_update=True)
+
+
 class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
     __tablename__ = 'AtomDAO'
 
@@ -33,17 +45,6 @@ class AtomDAO(Base, DataAccessObject[classes.example_classes.Atom]):
 
 
 
-class BackreferenceAggregatorDAO(Base, DataAccessObject[classes.example_classes.BackreferenceAggregator]):
-    __tablename__ = 'BackreferenceAggregatorDAO'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-
-
-
-    backreferences: Mapped[List[BackreferenceMappingDAO]] = relationship('BackreferenceMappingDAO', foreign_keys='[BackreferenceMappingDAO.backreferenceaggregatordao_backreferences_id]', post_update=True)
-
-
 class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.BackreferenceMapping]):
     __tablename__ = 'BackreferenceMappingDAO'
 
@@ -52,7 +53,6 @@ class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.Bac
 
     values: Mapped[List[int]] = mapped_column(JSON, nullable=False)
 
-    backreferenceaggregatordao_backreferences_id: Mapped[Optional[int]] = mapped_column(ForeignKey('BackreferenceAggregatorDAO.id', use_alter=True), nullable=True)
     reference_id: Mapped[int] = mapped_column(ForeignKey('ReferenceDAO.id', use_alter=True), nullable=True)
 
     reference: Mapped[ReferenceDAO] = relationship('ReferenceDAO', uselist=False, foreign_keys=[reference_id], post_update=True)
@@ -94,6 +94,8 @@ class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntit
     polymorphic_type: Mapped[str]
 
 
+    alternativemappingaggregatordao_entities1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('AlternativeMappingAggregatorDAO.id', use_alter=True), nullable=True)
+    alternativemappingaggregatordao_entities2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('AlternativeMappingAggregatorDAO.id', use_alter=True), nullable=True)
 
 
     __mapper_args__ = {

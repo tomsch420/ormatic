@@ -237,10 +237,10 @@ class BackreferenceMapping(AlternativeMapping[Backreference]):
     def create_from_dao(self) -> T:
         return Backreference({v:v for v in self.values}, self.reference)
 
-
 @dataclass
-class BackreferenceAggregator:
-    backreferences: List[Backreference]
+class AlternativeMappingAggregator:
+    entities1: List[Entity]
+    entities2: List[Entity]
 
 @dataclass
 class ItemWithBackreference:

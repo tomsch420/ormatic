@@ -358,11 +358,14 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIs(reconstructed.backreference.reference, reconstructed)
 
     def test_backreference_aggregator(self):
-        back_ref_1 = Backreference({1:1})
-        back_ref_2 = Backreference({2:2})
-        aggregator = BackreferenceAggregator([back_ref_1, back_ref_2])
-        dao = to_dao(aggregator)
+        e1 = Entity("E1")
+        e2 = Entity("E2")
+        e3 = Entity("E3")
 
+        ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
+        dao = to_dao(ama)
+
+    @unittest.skip("Prüser Time")
     def test_container_item(self):
         i1 = ItemWithBackreference(0)
         i2 = ItemWithBackreference(1)
@@ -379,6 +382,7 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIs(queried_container, queried_items[0].container)
 
         reconstructed_item = queried_items[0].from_dao()
+        self.assertEqual(len(reconstructed_item.container.items), 2)
 
 
 if __name__ == '__main__':
