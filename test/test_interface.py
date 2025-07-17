@@ -357,7 +357,7 @@ class InterfaceTestCase(unittest.TestCase):
         # Check that the circular reference is correctly reconstructed
         self.assertIs(reconstructed.backreference.reference, reconstructed)
 
-    def test_backreference_aggregator(self):
+    def test_alternative_mapping_aggregator(self):
         e1 = Entity("E1")
         e2 = Entity("E2")
         e3 = Entity("E3")
