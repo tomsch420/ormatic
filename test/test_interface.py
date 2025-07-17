@@ -363,7 +363,8 @@ class InterfaceTestCase(unittest.TestCase):
         e3 = Entity("E3")
 
         ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
-        dao = to_dao(ama)
+        dao: AlternativeMappingAggregatorDAO = to_dao(ama)
+
         self.session.add(dao)
         self.session.commit()
 
