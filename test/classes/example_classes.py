@@ -254,3 +254,55 @@ class Container:
     def __post_init__(self):
         for item in self.items:
             item.container = self
+
+
+@dataclass
+class Vector:
+    x: float
+
+@dataclass
+class VectorMapped(AlternativeMapping[Vector]):
+    x: float
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return VectorMapped(obj.x)
+
+@dataclass
+class Rotation:
+    angle: float
+
+@dataclass
+class RotationMapped(AlternativeMapping[Rotation]):
+    angle: float
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return RotationMapped(obj.angle)
+
+@dataclass
+class Transformation:
+    vector: Vector
+    rotation: Rotation
+
+@dataclass
+class TransformationMapped(AlternativeMapping[Transformation]):
+    vector: Vector
+    rotation: Rotation
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return TransformationMapped(obj.vector, obj.rotation)
+
+@dataclass
+class Shape:
+    name: str
+    origin: Transformation
+
+@dataclass
+class Shapes:
+    shapes: List[Shape]
+
+@dataclass
+class MoreShapes:
+    shapes: List[Shapes]

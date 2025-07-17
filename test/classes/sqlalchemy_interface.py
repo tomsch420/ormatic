@@ -159,6 +159,17 @@ class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.Kinematic
         'polymorphic_identity': 'KinematicChainDAO',
     }
 
+class MoreShapesDAO(Base, DataAccessObject[classes.example_classes.MoreShapes]):
+    __tablename__ = 'MoreShapesDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    shapes: Mapped[List[ShapesDAO]] = relationship('ShapesDAO', foreign_keys='[ShapesDAO.moreshapesdao_shapes_id]', post_update=True)
+
+
 class NodeDAO(Base, DataAccessObject[classes.example_classes.Node]):
     __tablename__ = 'NodeDAO'
 
@@ -283,6 +294,68 @@ class ReferenceDAO(Base, DataAccessObject[classes.example_classes.Reference]):
     backreference_id: Mapped[Optional[int]] = mapped_column(ForeignKey('BackreferenceMappingDAO.id', use_alter=True), nullable=True)
 
     backreference: Mapped[BackreferenceMappingDAO] = relationship('BackreferenceMappingDAO', uselist=False, foreign_keys=[backreference_id], post_update=True)
+
+
+class RotationMappedDAO(Base, DataAccessObject[classes.example_classes.RotationMapped]):
+    __tablename__ = 'RotationMappedDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    angle: Mapped[float]
+
+
+
+
+
+class ShapeDAO(Base, DataAccessObject[classes.example_classes.Shape]):
+    __tablename__ = 'ShapeDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    name: Mapped[str]
+
+
+    origin_id: Mapped[int] = mapped_column(ForeignKey('TransformationMappedDAO.id', use_alter=True), nullable=True)
+    shapesdao_shapes_id: Mapped[Optional[int]] = mapped_column(ForeignKey('ShapesDAO.id', use_alter=True), nullable=True)
+
+    origin: Mapped[TransformationMappedDAO] = relationship('TransformationMappedDAO', uselist=False, foreign_keys=[origin_id], post_update=True)
+
+
+class ShapesDAO(Base, DataAccessObject[classes.example_classes.Shapes]):
+    __tablename__ = 'ShapesDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+    moreshapesdao_shapes_id: Mapped[Optional[int]] = mapped_column(ForeignKey('MoreShapesDAO.id', use_alter=True), nullable=True)
+
+    shapes: Mapped[List[ShapeDAO]] = relationship('ShapeDAO', foreign_keys='[ShapeDAO.shapesdao_shapes_id]', post_update=True)
+
+
+class TransformationMappedDAO(Base, DataAccessObject[classes.example_classes.TransformationMapped]):
+    __tablename__ = 'TransformationMappedDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+    vector_id: Mapped[int] = mapped_column(ForeignKey('VectorMappedDAO.id', use_alter=True), nullable=True)
+    rotation_id: Mapped[int] = mapped_column(ForeignKey('RotationMappedDAO.id', use_alter=True), nullable=True)
+
+    vector: Mapped[VectorMappedDAO] = relationship('VectorMappedDAO', uselist=False, foreign_keys=[vector_id], post_update=True)
+    rotation: Mapped[RotationMappedDAO] = relationship('RotationMappedDAO', uselist=False, foreign_keys=[rotation_id], post_update=True)
+
+
+class VectorMappedDAO(Base, DataAccessObject[classes.example_classes.VectorMapped]):
+    __tablename__ = 'VectorMappedDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    x: Mapped[float]
+
+
+
 
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):

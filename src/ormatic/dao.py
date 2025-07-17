@@ -137,10 +137,12 @@ class DataAccessObject(HasGeneric[T]):
         if id(obj) in memo:
             result = memo[id(obj)]
 
+            # if the object is not the correct one (could happend when ids are reassigned)
             if not isinstance(result, cls):
-                raise ValueError(f"Expected result to be of type {cls} but got {result}")
-
-            return memo[id(obj)]
+                del memo[id(obj)]
+                # raise ValueError(f"Expected result to be of type {cls} but got {result}")
+            else:
+                return memo[id(obj)]
 
         # apply alternative mapping if needed
         if issubclass(cls.original_class(), AlternativeMapping):
@@ -152,7 +154,7 @@ class DataAccessObject(HasGeneric[T]):
 
         # register the result as in process
         if register:
-            memo[id(obj)] = result
+            #memo[id(obj)] = result
             memo[original_obj_id] = result
 
         # if the superclass of this dao is a DAO for an alternative mapping

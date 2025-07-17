@@ -395,5 +395,16 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(len(reconstructed_item.container.items), 2)
 
 
+    def test_nested_mappings(self):
+        shape_1 = Shape("rectangle", Transformation(Vector(1), Rotation(1)))
+        shape_2 = Shape("circle", Transformation(Vector(2), Rotation(2)))
+        shape_3 = Shape("rectangle", Transformation(Vector(3), Rotation(3)))
+        shapes = Shapes([shape_1, shape_2, shape_3])
+        more_shapes = MoreShapes([shapes, shapes])
+        dao = to_dao(more_shapes)
+        self.session.add(dao)
+        self.session.commit()
+
+
 if __name__ == '__main__':
     unittest.main()
