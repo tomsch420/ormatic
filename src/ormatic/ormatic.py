@@ -239,7 +239,7 @@ class WrappedTable:
 
         # this is the root of an inheritance structure
         if self.parent_table is None and len(self.child_tables) > 0:
-            self.builtin_columns.append((self.polymorphic_on_name, "Mapped[str]"))
+            self.custom_columns.append((self.polymorphic_on_name, "Mapped[str]", "mapped_column(String(255), nullable=False)"))
             self.mapper_args.update({
                 "'polymorphic_on'": f"'{self.polymorphic_on_name}'",
                 "'polymorphic_identity'": f"'{self.tablename}'",
@@ -346,7 +346,10 @@ class WrappedTable:
         if field_info.optional:
             inner_type = f"Optional[{inner_type}]"
 
-        self.builtin_columns.append((field_info.name, f"Mapped[{inner_type}]"))
+        if issubclass(field_info.type, str):
+            self.custom_columns.append((field_info.name, f"Mapped[{inner_type}]", f"mapped_column(String(255), nullable={field_info.optional})"))
+        else:
+            self.builtin_columns.append((field_info.name, f"Mapped[{inner_type}]"))
 
     def create_type_type_column(self, field_info: FieldInfo):
         column_name = field_info.name

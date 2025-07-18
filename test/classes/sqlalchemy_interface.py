@@ -63,9 +63,9 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    name: Mapped[str]
-    polymorphic_type: Mapped[str]
 
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
 
@@ -90,9 +90,9 @@ class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntit
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    overwritten_name: Mapped[str]
-    polymorphic_type: Mapped[str]
 
+    overwritten_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
     alternativemappingaggregatordao_entities1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('AlternativeMappingAggregatorDAO.id', use_alter=True), nullable=True)
     alternativemappingaggregatordao_entities2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('AlternativeMappingAggregatorDAO.id', use_alter=True), nullable=True)
@@ -147,9 +147,9 @@ class KinematicChainDAO(Base, DataAccessObject[classes.example_classes.Kinematic
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    name: Mapped[str]
-    polymorphic_type: Mapped[str]
 
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
     torsodao_kinematic_chains_id: Mapped[Optional[int]] = mapped_column(ForeignKey('TorsoDAO.id', use_alter=True), nullable=True)
 
@@ -242,8 +242,8 @@ class PositionDAO(Base, DataAccessObject[classes.example_classes.Position]):
     x: Mapped[float]
     y: Mapped[float]
     z: Mapped[float]
-    polymorphic_type: Mapped[str]
 
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
     doublepositionaggregatordao_positions1_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id', use_alter=True), nullable=True)
     doublepositionaggregatordao_positions2_id: Mapped[Optional[int]] = mapped_column(ForeignKey('DoublePositionAggregatorDAO.id', use_alter=True), nullable=True)
@@ -271,9 +271,9 @@ class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    polymorphic_type: Mapped[str]
 
     some_strings: Mapped[List[str]] = mapped_column(JSON, nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
     positions: Mapped[List[PositionDAO]] = relationship('PositionDAO', foreign_keys='[PositionDAO.positionsdao_positions_id]', post_update=True)
@@ -312,8 +312,8 @@ class ShapeDAO(Base, DataAccessObject[classes.example_classes.Shape]):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    name: Mapped[str]
 
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     origin_id: Mapped[int] = mapped_column(ForeignKey('TransformationMappedDAO.id', use_alter=True), nullable=True)
     shapesdao_shapes_id: Mapped[Optional[int]] = mapped_column(ForeignKey('ShapesDAO.id', use_alter=True), nullable=True)
@@ -378,8 +378,8 @@ class DerivedEntityDAO(CustomEntityDAO, DataAccessObject[classes.example_classes
 
     id: Mapped[int] = mapped_column(ForeignKey(CustomEntityDAO.id), primary_key=True)
 
-    description: Mapped[str]
 
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
 
