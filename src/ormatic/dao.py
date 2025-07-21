@@ -450,7 +450,7 @@ class DataAccessObject(HasGeneric[T]):
                 value = getattr(self, relationship.key)
                 if value is not None:
                     if isinstance(value, list):
-                        kwargs.append(f"{relationship.key}=[{", ".join(repr(v) for v in value)}]")
+                        kwargs.append(f"{relationship.key}=[{', '.join(repr(v) for v in value)}]")
                     else:
                         kwargs.append(f"{relationship.key}={repr(value)}")
                 else:
