@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import threading
 from functools import lru_cache
 from typing import Optional, List
 
@@ -14,6 +15,7 @@ from typing_extensions import Type, get_args, Dict, Any, TypeVar, Generic
 from .utils import recursive_subclasses
 
 logger = logging.getLogger(__name__)
+_repr_thread_local = threading.local()
 
 T = TypeVar('T')
 _DAO = TypeVar("_DAO", bound="DataAccessObject")
@@ -429,20 +431,34 @@ class DataAccessObject(HasGeneric[T]):
         return result
 
     def __repr__(self):
-        mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
-        kwargs = {}
-        for column in mapper.columns:
-            if is_data_column(column):
-                kwargs[column.name] = repr(getattr(self, column.name))
+        if not hasattr(_repr_thread_local, 'seen'):
+            _repr_thread_local.seen = set()
 
-        for relationship in mapper.relationships:
-            value = getattr(self, relationship.key)
-            kwargs[relationship.key] = repr(value)
+        if id(self) in _repr_thread_local.seen:
+            return f"{self.__class__.__name__}(...)"
 
-        kwargs_str = ", ".join([f"{key}={value}" for key, value in kwargs.items()])
+        _repr_thread_local.seen.add(id(self))
+        try:
+            mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
+            kwargs = []
+            for column in mapper.columns:
+                value = getattr(self, column.name)
+                if is_data_column(column):
+                    kwargs.append(f"{column.name}={repr(value)}")
 
-        result = f"{type(self).__name__}({kwargs_str})"
-        return result
+            for relationship in mapper.relationships:
+                value = getattr(self, relationship.key)
+                if value is not None:
+                    if isinstance(value, list):
+                        kwargs.append(f"{relationship.key}=[{", ".join(repr(v) for v in value)}]")
+                    else:
+                        kwargs.append(f"{relationship.key}={repr(value)}")
+                else:
+                    kwargs.append(f"{relationship.key}=None")
+
+            return f"{self.__class__.__name__}({', '.join(kwargs)})"
+        finally:
+            _repr_thread_local.seen.remove(id(self))
 
 
 class AlternativeMapping(HasGeneric[T]):
