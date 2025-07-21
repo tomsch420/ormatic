@@ -420,7 +420,7 @@ class DataAccessObject(HasGeneric[T]):
                 setattr(result, key, fixed)
 
         # If the result is an AlternativeMapping, we need to create the original object
-        if hasattr(result, "create_from_dao"):
+        if isinstance(result, AlternativeMapping):
             # If the result has a create_from_dao method, call it to finalize the object creation
             result = result.create_from_dao()
             memo[id(self)] = result  # Update the memo with the final object
