@@ -355,7 +355,19 @@ class VectorMappedDAO(Base, DataAccessObject[classes.example_classes.VectorMappe
     x: Mapped[float]
 
 
+    vectorswithpropertymappeddao_vectors_id: Mapped[Optional[int]] = mapped_column(ForeignKey('VectorsWithPropertyMappedDAO.id', use_alter=True), nullable=True)
 
+
+
+class VectorsWithPropertyMappedDAO(Base, DataAccessObject[classes.example_classes.VectorsWithPropertyMapped]):
+    __tablename__ = 'VectorsWithPropertyMappedDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    vectors: Mapped[List[VectorMappedDAO]] = relationship('VectorMappedDAO', foreign_keys='[VectorMappedDAO.vectorswithpropertymappeddao_vectors_id]', post_update=True)
 
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):

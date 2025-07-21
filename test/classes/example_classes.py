@@ -312,3 +312,22 @@ class Shapes:
 @dataclass
 class MoreShapes:
     shapes: List[Shapes]
+
+@dataclass
+class VectorsWithProperty:
+    _vectors: List[Vector]
+
+    @property
+    def vectors(self) -> List[Vector]:
+        return self._vectors
+
+@dataclass
+class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
+    vectors: List[Vector]
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        return VectorsWithPropertyMapped(obj.vectors)
+
+    def create_from_dao(self) -> T:
+        return VectorsWithProperty(self.vectors)

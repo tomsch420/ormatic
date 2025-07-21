@@ -404,6 +404,19 @@ class InterfaceTestCase(unittest.TestCase):
         self.session.add(dao)
         self.session.commit()
 
+    def test_vector_mapped(self):
+        vector = Vector(1.0)
+        vector_mapped = VectorsWithProperty([vector])
+        dao = to_dao(vector_mapped)
+
+        self.session.add(dao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(VectorsWithPropertyMappedDAO)).one()
+        reconstructed = queried.from_dao()
+
+        self.assertEqual(reconstructed.vectors[0].x, vector.x)
+
 
 if __name__ == '__main__':
     unittest.main()
