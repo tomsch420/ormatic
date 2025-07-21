@@ -268,6 +268,9 @@ class VectorMapped(AlternativeMapping[Vector]):
     def create_instance(cls, obj: T):
         return VectorMapped(obj.x)
 
+    def create_from_dao(self) -> T:
+        return Vector(self.x)
+
 @dataclass
 class Rotation:
     angle: float
@@ -293,6 +296,9 @@ class TransformationMapped(AlternativeMapping[Transformation]):
     @classmethod
     def create_instance(cls, obj: T):
         return TransformationMapped(obj.vector, obj.rotation)
+
+    def create_from_dao(self) -> T:
+        return Transformation(self.vector, self.rotation)
 
 @dataclass
 class Shape:

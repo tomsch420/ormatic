@@ -300,9 +300,9 @@ class DataAccessObject(HasGeneric[T]):
         defined for the DAO are properly mapped to the original domain model.
 
         :param memo: A dictionary used to maintain references to already-processed objects
-        to avoid duplications or cycles during DAO construction.
+                     to avoid duplications or cycles during DAO construction.
         :param in_progress: A dictionary used to track objects that are currently being processed
-        to detect circular dependencies.
+                            to detect circular dependencies.
         :return: The corresponding domain model representing the current Data Access Object
         """
         # Initialize dictionaries if they're None
@@ -311,22 +311,19 @@ class DataAccessObject(HasGeneric[T]):
         if in_progress is None:
             in_progress = {}
 
-        # If this object is already fully processed, return it from memo
+        # Return early if already fully constructed
         if id(self) in memo:
             return memo[id(self)]
 
-        # If this object is currently being processed (circular dependency), return None for now
-        # We'll fix the circular references later
-        if id(self) in in_progress:
-            return None
-
-        # Mark this object as being processed
+        # Phase 1: Allocate uninitialized object and memoize it immediately
+        result = self.original_class().__new__(self.original_class())
+        memo[id(self)] = result
         in_progress[id(self)] = True
 
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
 
         # get argument names of the original class
-        kwargs = dict()
+        kwargs = {}
         init_of_original_class = self.original_class().__init__
         argument_names = [p.name for p in inspect.signature(init_of_original_class).parameters.values()][1:]
 
@@ -350,28 +347,27 @@ class DataAccessObject(HasGeneric[T]):
             if (relationship.direction == MANYTOONE or (
                     relationship.direction == ONETOMANY and not relationship.uselist)):
                 if value is None:
-                    parsed = value
+                    parsed = None
                 else:
                     parsed = value.from_dao(memo=memo, in_progress=in_progress)
-                    if parsed is None:  # Circular reference detected
+                    if parsed is memo.get(id(value)):
                         circular_refs[relationship.key] = value
+                kwargs[relationship.key] = parsed
 
-            # handle on to many relationships
+            # handle one-to-many relationships
             elif relationship.direction == ONETOMANY:
                 if value:
                     og_instances = []
                     for v in value:
                         instance = v.from_dao(memo=memo, in_progress=in_progress)
-                        if instance is None:  # Circular reference detected
+                        if instance is memo.get(id(v)):
                             circular_refs.setdefault(relationship.key, []).append(v)
                         og_instances.append(instance)
-                    parsed = type(value)(og_instances)
+                    kwargs[relationship.key] = type(value)(og_instances)
                 else:
-                    parsed = value
+                    kwargs[relationship.key] = value
             else:
                 raise NotImplementedError(f"Cannot parse relationship {relationship}")
-
-            kwargs[relationship.key] = parsed
 
         # if i am the child of an alternatively mapped parent
         base = self.__class__.__bases__[0]
@@ -395,45 +391,40 @@ class DataAccessObject(HasGeneric[T]):
 
             # fill the gaps from the base result
             for argument in argument_names:
-                try:
-                    base_result_value = getattr(base_result, argument)
-                    kwargs[argument] = base_result_value
-                except AttributeError:
-                    ...
+                if not hasattr(result, argument):
+                    try:
+                        setattr(result, argument, getattr(base_result, argument))
+                    except AttributeError:
+                        ...
 
-        # assemble result and memoize
-        result = self.original_class()(**kwargs)
-        if isinstance(result, AlternativeMapping):
+        # Assign all attributes manually
+        for key, val in kwargs.items():
+            setattr(result, key, val)
+
+        # Optional: Call __post_init__ if it exists
+        if hasattr(result, "__post_init__"):
+            result.__post_init__()
+
+        # If the result is an AlternativeMapping, we need to create the original object
+        if hasattr(result, "create_from_dao"):
+            # If the result has a create_from_dao method, call it to finalize the object creation
             result = result.create_from_dao()
+            memo[id(self)] = result  # Update the memo with the final object
 
-        # Add the result to memo before fixing circular references
-        memo[id(self)] = result
-
-        # Remove from in_progress since we're done processing this object
+        # Done processing this object
         del in_progress[id(self)]
 
         # Fix circular references
         for key, value in circular_refs.items():
             if isinstance(value, list):
-                # Handle one-to-many relationships
-                for i, v in enumerate(value):
-                    # Find the corresponding domain object in memo
-                    for memo_id, memo_obj in memo.items():
-                        if hasattr(memo_obj, '__class__') and memo_obj.__class__.__name__ == v.original_class().__name__:
-                            getattr(result, key)[i] = memo_obj
-                            break
+                fixed_list = []
+                for v in value:
+                    fixed = memo.get(id(v))
+                    fixed_list.append(fixed)
+                setattr(result, key, fixed_list)
             else:
-                # Handle one-to-one relationships
-                # Find the corresponding domain object in memo
-                for memo_id, memo_obj in memo.items():
-                    if hasattr(memo_obj, '__class__') and memo_obj.__class__.__name__ == value.original_class().__name__:
-                        setattr(result, key, memo_obj)
-                        break
-
-        # Special handling for Backreference and Reference circular dependency
-        if result.__class__.__name__ == 'Reference' and hasattr(result, 'backreference') and result.backreference is not None:
-            if hasattr(result.backreference, 'reference') and result.backreference.reference is None:
-                result.backreference.reference = result
+                fixed = memo.get(id(value))
+                setattr(result, key, fixed)
 
         return result
 

@@ -363,7 +363,7 @@ class InterfaceTestCase(unittest.TestCase):
         e3 = Entity("E3")
 
         ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
-        dao: AlternativeMappingAggregatorDAO = to_dao(ama)
+        dao = to_dao(ama)
 
         self.assertIs(dao.entities1[1], dao.entities2[0])
 
@@ -375,7 +375,6 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIs(reconstructed.entities1[1], reconstructed.entities2[0])
 
 
-    @unittest.skip("Prüser Time")
     def test_container_item(self):
         i1 = ItemWithBackreference(0)
         i2 = ItemWithBackreference(1)
