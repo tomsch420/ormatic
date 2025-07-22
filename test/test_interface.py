@@ -363,7 +363,7 @@ class InterfaceTestCase(unittest.TestCase):
         e3 = Entity("E3")
 
         ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
-        dao: AlternativeMappingAggregatorDAO = to_dao(ama)
+        dao = to_dao(ama)
 
         self.assertIs(dao.entities1[1], dao.entities2[0])
 
@@ -375,7 +375,6 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertIs(reconstructed.entities1[1], reconstructed.entities2[0])
 
 
-    @unittest.skip("Prüser Time")
     def test_container_item(self):
         i1 = ItemWithBackreference(0)
         i2 = ItemWithBackreference(1)
@@ -404,6 +403,19 @@ class InterfaceTestCase(unittest.TestCase):
         dao = to_dao(more_shapes)
         self.session.add(dao)
         self.session.commit()
+
+    def test_vector_mapped(self):
+        vector = Vector(1.0)
+        vector_mapped = VectorsWithProperty([vector])
+        dao = to_dao(vector_mapped)
+
+        self.session.add(dao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(VectorsWithPropertyMappedDAO)).one()
+        reconstructed = queried.from_dao()
+
+        self.assertEqual(reconstructed.vectors[0].x, vector.x)
 
 
 if __name__ == '__main__':
