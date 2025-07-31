@@ -477,6 +477,8 @@ class AlternativeMapping(HasGeneric[T]):
             memo = {}
         if id(obj) in memo:
             return memo[id(obj)]
+        elif isinstance(obj, cls):
+            return obj
         else:
             result = cls.create_instance(obj)
             # memo[id(obj)] = result
