@@ -333,37 +333,36 @@ class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
         return VectorsWithProperty(self.vectors)
 
 @dataclass
-class TestClass:
+class ParentBase:
     name: str
     value: int
 
 @dataclass
-class TestClass2(TestClass):
+class ChildBase(ParentBase):
     pass
 
 
 @dataclass
-class TestClassMapping(AlternativeMapping[TestClass]):
+class ParentBaseMapping(AlternativeMapping[ParentBase]):
     name: str
 
     @classmethod
     def create_instance(cls, obj: T):
-        if not isinstance(obj, TestClass):
-            raise TypeError(f"Expected TestClass, got {type(obj)}")
-        return TestClassMapping(obj.name)
+        if not isinstance(obj, Parent):
+            raise TypeError(f"Expected Parent, got {type(obj)}")
+        return ParentBaseMapping(obj.name)
 
     def create_from_dao(self) -> T:
-        return TestClass(self.name, 0)
+        return ParentBase(self.name, 0)
 
 @dataclass
-class TestClass2Mapping(AlternativeMapping[TestClass2]):
-    name: str
+class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     @classmethod
     def create_instance(cls, obj: T):
-        if not isinstance(obj, TestClass2):
+        if not isinstance(obj, ChildMapped):
             raise TypeError(f"Expected TestClass2, got {type(obj)}")
-        return TestClass2Mapping(obj.name)
+        return ChildBaseMapping(obj.name)
 
     def create_from_dao(self) -> T:
-        return TestClassMapping(self.name)
+        return ChildBase(self.name, 0)
