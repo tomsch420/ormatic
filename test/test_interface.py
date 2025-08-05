@@ -163,8 +163,8 @@ class InterfaceTestCase(unittest.TestCase):
         child_mapped = ChildMapped("ChildMapped", 42)
         child_not_mapped = ChildNotMapped("a", 2, {})
 
-        parent_dao = ParentDAO.to_dao(parent)
-        child_dao = ChildMappedDAO.to_dao(child_mapped)
+        parent_dao = to_dao(parent)
+        child_dao = to_dao(child_mapped)
 
         self.assertEqual(parent.name, parent_dao.name)
         self.assertEqual(child_mapped.name, child_dao.name)
@@ -416,6 +416,29 @@ class InterfaceTestCase(unittest.TestCase):
         reconstructed = queried.from_dao()
 
         self.assertEqual(reconstructed.vectors[0].x, vector.x)
+
+    def test_test_classes(self):
+        parent = ParentBase("x", 0)
+        child = ChildBase("y", 0)
+        parent_mapping = ParentBaseMapping("x")
+        child_mapping = ChildBaseMapping("y")
+
+        parent_dao = to_dao(parent_mapping)
+        child_dao = to_dao(child_mapping)
+
+        self.session.add_all([parent_dao, child_dao])
+        self.session.commit()
+
+        child_result_dao = self.session.scalars(select(ChildBaseMappingDAO)).one()
+        parent_result_dao = self.session.scalars(select(ParentBaseMappingDAO)).first()
+
+        child_from_dao = child_result_dao.from_dao()
+        parent_from_dao = parent_result_dao.from_dao()
+
+        self.assertEqual(child_result_dao, child_dao)
+        self.assertEqual(parent_result_dao, parent_dao)
+        self.assertEqual(child_from_dao, child)
+        self.assertEqual(parent_from_dao, parent)
 
 
 if __name__ == '__main__':
