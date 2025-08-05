@@ -333,6 +333,22 @@ class ShapesDAO(Base, DataAccessObject[classes.example_classes.Shapes]):
     shapes: Mapped[List[ShapeDAO]] = relationship('ShapeDAO', foreign_keys='[ShapeDAO.shapesdao_shapes_id]', post_update=True)
 
 
+class TestClassMappingDAO(Base, DataAccessObject[classes.example_classes.TestClassMapping]):
+    __tablename__ = 'TestClassMappingDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'TestClassMappingDAO',
+    }
+
 class TransformationMappedDAO(Base, DataAccessObject[classes.example_classes.TransformationMapped]):
     __tablename__ = 'TransformationMappedDAO'
 
@@ -444,6 +460,21 @@ class PositionsSubclassWithAnotherPositionDAO(PositionsDAO, DataAccessObject[cla
     __mapper_args__ = {
         'polymorphic_identity': 'PositionsSubclassWithAnotherPositionDAO',
         'inherit_condition': id == PositionsDAO.id,
+    }
+
+class TestClass2MappingDAO(TestClassMappingDAO, DataAccessObject[classes.example_classes.TestClass2Mapping]):
+    __tablename__ = 'TestClass2MappingDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(TestClassMappingDAO.id), primary_key=True)
+
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'TestClass2MappingDAO',
+        'inherit_condition': id == TestClassMappingDAO.id,
     }
 
 class Position5DDAO(Position4DDAO, DataAccessObject[classes.example_classes.Position5D]):

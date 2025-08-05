@@ -331,3 +331,39 @@ class VectorsWithPropertyMapped(AlternativeMapping[VectorsWithProperty]):
 
     def create_from_dao(self) -> T:
         return VectorsWithProperty(self.vectors)
+
+@dataclass
+class TestClass:
+    name: str
+    value: int
+
+@dataclass
+class TestClass2(TestClass):
+    pass
+
+
+@dataclass
+class TestClassMapping(AlternativeMapping[TestClass]):
+    name: str
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        if not isinstance(obj, TestClass):
+            raise TypeError(f"Expected TestClass, got {type(obj)}")
+        return TestClassMapping(obj.name)
+
+    def create_from_dao(self) -> T:
+        return TestClass(self.name, 0)
+
+@dataclass
+class TestClass2Mapping(AlternativeMapping[TestClass2]):
+    name: str
+
+    @classmethod
+    def create_instance(cls, obj: T):
+        if not isinstance(obj, TestClass2):
+            raise TypeError(f"Expected TestClass2, got {type(obj)}")
+        return TestClass2Mapping(obj.name)
+
+    def create_from_dao(self) -> T:
+        return TestClassMapping(self.name)

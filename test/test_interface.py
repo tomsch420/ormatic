@@ -417,6 +417,17 @@ class InterfaceTestCase(unittest.TestCase):
 
         self.assertEqual(reconstructed.vectors[0].x, vector.x)
 
+    def test_test_classes(self):
+        test_class = TestClass2Mapping("x")
+
+        test_class_dao = TestClass2MappingDAO.to_dao(test_class)
+
+        self.session.add(test_class_dao)
+        self.session.commit()
+
+        queried = self.session.scalars(select(TestClass2MappingDAO)).one()
+        self.assertEqual(queried, test_class_dao)
+
 
 if __name__ == '__main__':
     unittest.main()
