@@ -58,6 +58,22 @@ class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.Bac
     reference: Mapped[ReferenceDAO] = relationship('ReferenceDAO', uselist=False, foreign_keys=[reference_id], post_update=True)
 
 
+class ParentBaseMappingDAO(Base, DataAccessObject[classes.example_classes.ParentBaseMapping]):
+    __tablename__ = 'ParentBaseMappingDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'ParentBaseMappingDAO',
+    }
+
 class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
     __tablename__ = 'ParentDAO'
 
@@ -369,6 +385,20 @@ class VectorsWithPropertyMappedDAO(Base, DataAccessObject[classes.example_classe
 
     vectors: Mapped[List[VectorMappedDAO]] = relationship('VectorMappedDAO', foreign_keys='[VectorMappedDAO.vectorswithpropertymappeddao_vectors_id]', post_update=True)
 
+
+class ChildBaseMappingDAO(ParentBaseMappingDAO, DataAccessObject[classes.example_classes.ChildBaseMapping]):
+    __tablename__ = 'ChildBaseMappingDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(ParentBaseMappingDAO.id), primary_key=True)
+
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'ChildBaseMappingDAO',
+        'inherit_condition': id == ParentBaseMappingDAO.id,
+    }
 
 class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMapped]):
     __tablename__ = 'ChildMappedDAO'
