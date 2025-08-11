@@ -118,7 +118,7 @@ class DataAccessObject(HasGeneric[T]):
     """
 
     @classmethod
-    def to_dao(cls, obj: T, memo: Dict[int, Any] = None, register=True) -> _DAO:
+    def to_dao(cls, obj: T, memo: Dict[int, Any] = None, keep_alive: Dict[int, Any] = None, register=True) -> _DAO:
         """
         Converts an object to its Data Access Object (DAO) equivalent using a class method. This method ensures that
         objects are not processed multiple times by using a memoization technique. It also handles alternative
@@ -127,6 +127,8 @@ class DataAccessObject(HasGeneric[T]):
         :param obj: Object to be converted into its DAO equivalent
         :param memo: Dictionary that keeps track of already converted objects to avoid duplicate processing.
             Defaults to None.
+        :param keep_alive: Dictionary to keep track of objects that should not be garbage collected during the conversion.
+            Defaults to None.
         :param register: Whether to register the DAO class in the memo.
         :return: Instance of the DAO class (_DAO) that represents the input object after conversion
         """
@@ -134,6 +136,9 @@ class DataAccessObject(HasGeneric[T]):
         # check if the obj has been converted to a dao already
         if memo is None:
             memo = {}
+
+        if keep_alive is None:
+            keep_alive = {}
 
         original_obj_id = id(obj)
         if id(obj) in memo:
@@ -148,7 +153,9 @@ class DataAccessObject(HasGeneric[T]):
 
         # apply alternative mapping if needed
         if issubclass(cls.original_class(), AlternativeMapping):
-            obj = cls.original_class().to_dao(obj, memo=memo)
+            dao_obj = cls.original_class().to_dao(obj, memo=memo, keep_alive=keep_alive)
+        else:
+            dao_obj = obj
 
         # get the primary inheritance route
         base = cls.__bases__[0]
@@ -158,16 +165,17 @@ class DataAccessObject(HasGeneric[T]):
         if register:
             #memo[id(obj)] = result
             memo[original_obj_id] = result
+            keep_alive[original_obj_id] = obj
 
         # if the superclass of this dao is a DAO for an alternative mapping
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
-            result.to_dao_if_subclass_of_alternative_mapping(obj=obj, memo=memo, base=base)
+            result.to_dao_if_subclass_of_alternative_mapping(obj=dao_obj, memo=memo, keep_alive=keep_alive, base=base)
         else:
-            result.to_dao_default(obj=obj, memo=memo)
+            result.to_dao_default(obj=dao_obj, memo=memo, keep_alive=keep_alive)
 
         return result
 
-    def to_dao_default(self, obj: T, memo: Dict[int, Any]):
+    def to_dao_default(self, obj: T, memo: Dict[int, Any], keep_alive: Dict[int, Any]):
         """
         Converts the given object into a Data Access Object (DAO) representation
         by extracting column and relationship data. This method is primarily used
@@ -176,15 +184,17 @@ class DataAccessObject(HasGeneric[T]):
 
         :param obj: The source object to be converted into a DAO representation.
         :param memo: A dictionary to handle cyclic references by tracking processed objects.
+
         """
         # Fill super class columns, Mapper-columns - self.columns
         mapper: sqlalchemy.orm.Mapper = sqlalchemy.inspection.inspect(type(self))
 
         # Create a new instance of the DAO class
         self.get_columns_from(obj=obj, columns=mapper.columns)
-        self.get_relationships_from(obj=obj, relationships=mapper.relationships, memo=memo)
+        self.get_relationships_from(obj=obj, relationships=mapper.relationships, memo=memo, keep_alive=keep_alive)
 
-    def to_dao_if_subclass_of_alternative_mapping(self, obj: T, memo: Dict[int, Any], base: Type[DataAccessObject]):
+    def to_dao_if_subclass_of_alternative_mapping(self, obj: T, memo: Dict[int, Any], keep_alive: Dict[int, Any],
+                                                  base: Type[DataAccessObject]):
         """
         Transforms the given object into a corresponding Data Access Object (DAO) if it is a
         subclass of an alternatively mapped entity. This involves processing both the inherited
@@ -193,6 +203,8 @@ class DataAccessObject(HasGeneric[T]):
         :param obj: The source object to be transformed into a DAO.
         :param memo: A dictionary used to handle circular references when transforming objects.
                      Typically acts as a memoization structure for keeping track of processed objects.
+        :param keep_alive: A dictionary to ensure that objects remain in memory during the transformation
+                          process, preventing them from being garbage collected prematurely.
         :param base: The parent class type that defines the base mapping for the DAO.
         :return: None. The method directly modifies the DAO instance by populating it with attribute
                  and relationship data from the source object.
@@ -205,7 +217,7 @@ class DataAccessObject(HasGeneric[T]):
             del memo[id(obj)]
 
         # create dao of alternatively mapped superclass
-        parent_dao = base.original_class().to_dao(obj, memo=memo)
+        parent_dao = base.original_class().to_dao(obj, memo=memo, keep_alive=keep_alive)
 
         # Restore the object in the memo dictionary
         if temp_dao is not None:
@@ -234,7 +246,7 @@ class DataAccessObject(HasGeneric[T]):
         for relationship in relationships_of_parent:
             setattr(self, relationship.key, getattr(parent_dao, relationship.key))
 
-        self.get_relationships_from(obj, relationships_of_this_table, memo)
+        self.get_relationships_from(obj, relationships_of_this_table, memo, keep_alive)
 
     def get_columns_from(self, obj: T, columns: List):
         """
@@ -255,7 +267,8 @@ class DataAccessObject(HasGeneric[T]):
             if is_data_column(column):
                 setattr(self, column.name, getattr(obj, column.name))
 
-    def get_relationships_from(self, obj: T, relationships: List[RelationshipProperty], memo: Dict[int, Any]):
+    def get_relationships_from(self, obj: T, relationships: List[RelationshipProperty], memo: Dict[int, Any],
+                               keep_alive: Dict[int, Any]):
         """
         Retrieve and update relationships from an object based on the given relationship
         properties. This function processes various types of relationships (e.g., one-to-one,
@@ -267,6 +280,8 @@ class DataAccessObject(HasGeneric[T]):
             relationships to be accessed from the source object.
         :param memo: A dictionary used to maintain references to already-processed objects
             to avoid duplications or cycles during DAO construction.
+        :param keep_alive: A dictionary to ensure that objects remain in memory during the
+            transformation process, preventing them from being garbage collected prematurely.
         :return: None
         """
         for relationship in relationships:
@@ -282,7 +297,7 @@ class DataAccessObject(HasGeneric[T]):
                     dao_class = get_dao_class(type(value_in_obj))
                     if dao_class is None:
                         raise NoDAOFoundDuringParsingError(value_in_obj, type(self), relationship)
-                    dao_of_value = dao_class.to_dao(value_in_obj, memo=memo)
+                    dao_of_value = dao_class.to_dao(value_in_obj, memo=memo, keep_alive=keep_alive)
 
                 setattr(self, relationship.key, dao_of_value)
 
@@ -291,7 +306,7 @@ class DataAccessObject(HasGeneric[T]):
                 result = []
                 value_in_obj = getattr(obj, relationship.key)
                 for v in value_in_obj:
-                    result.append(get_dao_class(type(v)).to_dao(v, memo=memo))
+                    result.append(get_dao_class(type(v)).to_dao(v, memo=memo, keep_alive=keep_alive))
 
                 setattr(self, relationship.key, result)
 
@@ -464,12 +479,13 @@ class DataAccessObject(HasGeneric[T]):
 class AlternativeMapping(HasGeneric[T]):
 
     @classmethod
-    def to_dao(cls, obj: T, memo: Dict[int, Any] = None) -> _DAO:
+    def to_dao(cls, obj: T, memo: Dict[int, Any] = None, keep_alive: Dict[int, Any] = None) -> _DAO:
         """
         Create a DAO from the obj if it doesn't exist.
 
         :param obj: The obj to create the DAO from.
         :param memo: The memo dictionary to check for already build instances.
+        :param keep_alive: The keep_alive dictionary to keep the object alive during the conversion.
 
         :return: An instance of this class created from the obj.
         """
@@ -525,11 +541,15 @@ def get_alternative_mapping(cls: Type) -> Optional[Type[DataAccessObject]]:
     return None
 
 
-def to_dao(obj: Any, memo: Dict[int, Any] = None) -> DataAccessObject:
+def to_dao(obj: Any, memo: Dict[int, Any] = None, keep_alive: Dict[int, Any] = None) -> DataAccessObject:
     """
     Convert any object to a dao class.
+
+    :param obj: The object to convert to a dao.
+    :param memo: A dictionary to keep track of already converted objects.
+    :param keep_alive: A dictionary to keep the object alive during the conversion.
     """
     dao_class = get_dao_class(type(obj))
     if dao_class is None:
         raise NoDAOFoundError(type(obj))
-    return dao_class.to_dao(obj, memo)
+    return dao_class.to_dao(obj, memo, keep_alive)
