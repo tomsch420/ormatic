@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, configure_mappers
 from classes.example_classes import *
 from classes.sqlalchemy_interface import *
 from ormatic.dao import to_dao, NoDAOFoundDuringParsingError, is_data_column
+from ormatic.utils import drop_database
 
 
 class InterfaceTestCase(unittest.TestCase):
@@ -24,7 +25,8 @@ class InterfaceTestCase(unittest.TestCase):
         Base.metadata.create_all(self.engine)
 
     def tearDown(self):
-        Base.metadata.drop_all(self.engine)
+        drop_database(self.engine)
+        #Base.metadata.drop_all(self.engine)
 
     @classmethod
     def tearDownClass(cls):
