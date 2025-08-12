@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session, configure_mappers
 from entity_query_language.entity import let
 from entity_query_language.symbolic import Or, in_
 
-from classes.example_classes import Position
-from classes.sqlalchemy_interface import Base, PositionDAO
+from classes.example_classes import Position, Pose, Orientation
+from classes.sqlalchemy_interface import Base, PositionDAO, PoseDAO
 
 from ormatic.eql_interface import eql_to_sqlalchemy
 from ormatic.utils import drop_database
@@ -36,6 +36,14 @@ class EQLTestCase(unittest.TestCase):
         # values is a list of (x, y, z)
         for x, y, z in values:
             dao = PositionDAO.to_dao(Position(x, y, z))
+            self.session.add(dao)
+        self.session.commit()
+
+    def _add_poses(self, positions):
+        # positions is a list of (x, y, z) for Pose.position
+        for x, y, z in positions:
+            pose = Pose(Position(x, y, z), Orientation(0.0, 0.0, 0.0, None))
+            dao = PoseDAO.to_dao(pose)
             self.session.add(dao)
         self.session.commit()
 
@@ -74,6 +82,24 @@ class EQLTestCase(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(zs, [4, 10])
         self.assertEqual(xs, [1, 2])
+
+    def test_translate_join_one_to_one(self):
+        # Arrange: create poses with different position.z
+        self._add_poses([(1, 2, 3), (1, 2, 4)])
+
+        # Build EQL expression: pose.position.z > 3 (requires join from PoseDAO to PositionDAO)
+        pose = let(type_=Pose, domain=[Pose(Position(0, 0, 0), Orientation(0.0, 0.0, 0.0, None))])
+        expr = pose.position.z > 3
+
+        # Act
+        stmt = eql_to_sqlalchemy(expr)
+        rows = self.session.scalars(stmt).all()
+
+        # Assert: only the pose with position.z == 4 should match
+        self.assertEqual(len(rows), 1)
+        self.assertIsInstance(rows[0], PoseDAO)
+        self.assertIsNotNone(rows[0].position)
+        self.assertEqual(rows[0].position.z, 4)
 
     def test_translate_in_operator(self):
         # Arrange
