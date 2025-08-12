@@ -1,3 +1,4 @@
 sqlalchemy
 rustworkx
 jinja2
+entity_query_language

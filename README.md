@@ -70,3 +70,58 @@ if __name__ == '__main__':
 
 # TODO List
 - ~~Nothing~~
+
+## Using Entity Query Language with ORMatic (EQL → SQLAlchemy)
+
+You can express queries using the entity_query_language library and translate them into SQLAlchemy statements with ormatic.
+
+Example using the sample classes from test/classes and the generated SQLAlchemy interface:
+
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, configure_mappers
+
+from entity_query_language.entity import let
+from entity_query_language.symbolic import Or, in_
+
+from classes.example_classes import Position
+from classes.sqlalchemy_interface import Base, PositionDAO
+
+from ormatic.eql_interface import eql_to_sqlalchemy
+
+# Initialize in-memory DB
+configure_mappers()
+engine = create_engine('sqlite:///:memory:')
+session = Session(engine)
+Base.metadata.create_all(engine)
+
+# Insert sample data
+session.add_all([
+    PositionDAO.to_dao(Position(1, 2, 3)),
+    PositionDAO.to_dao(Position(1, 2, 4)),
+    PositionDAO.to_dao(Position(2, 9, 10)),
+])
+session.commit()
+
+# Build an EQL expression
+position = let(type_=Position, domain=[Position(0, 0, 0)])  # domain content is irrelevant for translation
+expr = position.z > 3  # simple comparator
+
+# Translate to SQLAlchemy and execute
+stmt = eql_to_sqlalchemy(expr)
+rows = session.scalars(stmt).all()  # → PositionDAO rows with z > 3
+
+# More complex logic
+expr2 = Or(position.z == 4, position.x == 2)
+stmt2 = eql_to_sqlalchemy(expr2)
+rows2 = session.scalars(stmt2).all()  # rows where z == 4 OR x == 2
+
+# Using "in" operator
+expr3 = in_(position.x, [1, 7])
+stmt3 = eql_to_sqlalchemy(expr3)
+rows3 = session.scalars(stmt3).all()  # rows where x ∈ {1, 7}
+```
+
+Notes:
+- The translator maps EQL Variables to the corresponding DAO classes (via ormatic.dao.get_dao_class) and produces a SQLAlchemy select(...) with a WHERE clause.
+- It currently focuses on direct attribute comparisons on a single table and supports ==, !=, >, >=, <, <=, and in, as well as logical AND/OR.
