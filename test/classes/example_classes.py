@@ -372,6 +372,14 @@ class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 class Body:
     name: str
 
+@dataclass
+class Handle(Body):
+    ...
+
+@dataclass
+class Container(Body):
+    ...
+
 
 @dataclass
 class Connection:

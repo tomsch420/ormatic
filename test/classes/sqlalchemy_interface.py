@@ -65,10 +65,15 @@ class BodyDAO(Base, DataAccessObject[classes.example_classes.Body]):
 
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
 
     worlddao_bodies_id: Mapped[Optional[int]] = mapped_column(ForeignKey('WorldDAO.id', use_alter=True), nullable=True)
 
 
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'BodyDAO',
+    }
 
 class ParentBaseMappingDAO(Base, DataAccessObject[classes.example_classes.ParentBaseMapping]):
     __tablename__ = 'ParentBaseMappingDAO'
@@ -122,17 +127,6 @@ class ConnectionDAO(Base, DataAccessObject[classes.example_classes.Connection]):
         'polymorphic_identity': 'ConnectionDAO',
     }
 
-class ContainerDAO(Base, DataAccessObject[classes.example_classes.Container]):
-    __tablename__ = 'ContainerDAO'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-
-
-
-    items: Mapped[List[ItemWithBackreferenceDAO]] = relationship('ItemWithBackreferenceDAO', foreign_keys='[ItemWithBackreferenceDAO.containerdao_items_id]', post_update=True)
-
-
 class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntity]):
     __tablename__ = 'CustomEntityDAO'
 
@@ -184,7 +178,6 @@ class ItemWithBackreferenceDAO(Base, DataAccessObject[classes.example_classes.It
     value: Mapped[int]
 
 
-    containerdao_items_id: Mapped[Optional[int]] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
     container_id: Mapped[int] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
 
     container: Mapped[ContainerDAO] = relationship('ContainerDAO', uselist=False, foreign_keys=[container_id], post_update=True)
@@ -430,6 +423,34 @@ class WorldDAO(Base, DataAccessObject[classes.example_classes.World]):
     bodies: Mapped[List[BodyDAO]] = relationship('BodyDAO', foreign_keys='[BodyDAO.worlddao_bodies_id]', post_update=True)
     connections: Mapped[List[ConnectionDAO]] = relationship('ConnectionDAO', foreign_keys='[ConnectionDAO.worlddao_connections_id]', post_update=True)
 
+
+class HandleDAO(BodyDAO, DataAccessObject[classes.example_classes.Handle]):
+    __tablename__ = 'HandleDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(BodyDAO.id), primary_key=True)
+
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'HandleDAO',
+        'inherit_condition': id == BodyDAO.id,
+    }
+
+class ContainerDAO(BodyDAO, DataAccessObject[classes.example_classes.Container]):
+    __tablename__ = 'ContainerDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(BodyDAO.id), primary_key=True)
+
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'ContainerDAO',
+        'inherit_condition': id == BodyDAO.id,
+    }
 
 class ChildBaseMappingDAO(ParentBaseMappingDAO, DataAccessObject[classes.example_classes.ChildBaseMapping]):
     __tablename__ = 'ChildBaseMappingDAO'

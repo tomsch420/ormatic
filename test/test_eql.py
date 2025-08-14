@@ -1,14 +1,15 @@
 import unittest
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import MultipleResultsFound
-from sqlalchemy.orm import Session, configure_mappers
+from sqlalchemy.orm import Session, configure_mappers, aliased
 
-from entity_query_language.entity import let, an, entity, the
+from entity_query_language.entity import let, an, entity, the, set_of, And
 from entity_query_language import Or, in_
 
-from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body
+from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body, Handle, \
+    Container
 from classes.sqlalchemy_interface import Base, PositionDAO, PoseDAO, OrientationDAO, ParentDAO, WorldDAO, FixedDAO, \
-    PrismaticDAO
+    PrismaticDAO, BodyDAO, ContainerDAO, HandleDAO
 from ormatic.dao import to_dao
 
 from ormatic.eql_interface import eql_to_sql
@@ -164,7 +165,55 @@ class EQLTestCase(unittest.TestCase):
         self.assertEqual(result[0].parent.name, "Container2")
         self.assertEqual(result[0].child.name, "Handle2")
 
+    def test_complicated_equal(self):
+        # Create the world with its bodies and connections
+        world = World(1, [Container("Container1"), Container("Container2"), Handle("Handle1"), Handle("Handle2")])
+        c1_c2 = Prismatic(world.bodies[0], world.bodies[1])
+        c2_h2 = Fixed(world.bodies[1], world.bodies[3])
+        world.connections = [c1_c2, c2_h2]
 
+        dao = to_dao(world)
+        self.session.add(dao)
+        self.session.commit()
+
+        # Query for the kinematic tree of the drawer which has more than one component.
+        # Declare the placeholders
+        parent_container = let(type_=Container, domain=world.bodies)
+        prismatic_connection = let(type_=Prismatic, domain=world.connections)
+        drawer_body = let(type_=Container, domain=world.bodies)
+        fixed_connection = let(type_=Fixed, domain=world.connections)
+        handle = let(type_=Handle, domain=world.bodies)
+        drawer_kinematic_tree = (parent_container, prismatic_connection, drawer_body, fixed_connection, handle)
+
+        # Write the query body
+        query = the(entity(drawer_body,
+                           And(parent_container == prismatic_connection.parent,
+                               drawer_body == prismatic_connection.child,
+                               drawer_body == fixed_connection.parent, handle == fixed_connection.child)
+                           )
+                    )
+
+        translator = eql_to_sql(query, self.session)
+
+        parent_container = aliased(ContainerDAO)
+        drawer_body = aliased(ContainerDAO)
+        handle = aliased(HandleDAO)
+
+        query_by_hand = (
+            select(drawer_body)
+            .join_from(drawer_body, PrismaticDAO, PrismaticDAO.child_id == drawer_body.id)
+            .join_from(drawer_body, FixedDAO, FixedDAO.parent_id == drawer_body.id)
+            .join_from(FixedDAO, handle, FixedDAO.child_id == handle.id)
+        )
+
+        result = self.session.scalars(query_by_hand).one()
+
+
+
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+        #
+        # result = (query.evaluate())
+        # assert result.name == "Container2"
 
 
 
