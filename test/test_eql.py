@@ -149,13 +149,23 @@ class EQLTestCase(unittest.TestCase):
         fixed_connection = let(type_=Fixed, domain=world.connections)
 
         # Write the query body
-        result = an(entity(fixed_connection,
+        query = an(entity(fixed_connection,
                                fixed_connection.parent == prismatic_connection.child)
                     )
-        translator = eql_to_sql(result, self.session)
+        translator = eql_to_sql(query, self.session)
 
         query_by_hand = select(FixedDAO).join(PrismaticDAO, onclause=PrismaticDAO.child_id == FixedDAO.parent_id)
         self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
+        result = translator.evaluate()
+
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], FixedDAO)
+        self.assertEqual(result[0].parent.name, "Container2")
+        self.assertEqual(result[0].child.name, "Handle2")
+
+
+
 
 
 

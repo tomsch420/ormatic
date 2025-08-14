@@ -43,7 +43,10 @@ class EQLTranslator:
     session: Session
 
     sql_query: Optional[Select] = None
-    _joined_daos: set[type] = None
+    # Tracks joins introduced while traversing attribute chains (by path)
+    _joined_daos: set[Any] = None
+    # Tracks joins of whole DAO classes introduced due to variable equality joins
+    _joined_tables: set[type] = None
 
     @property
     def quantifier(self):
@@ -60,10 +63,12 @@ class EQLTranslator:
     def translate(self) -> List[Any]:
         dao_class = get_dao_class(self.select_like.selected_variable_._cls_)
         self.sql_query = select(dao_class)
-        # initialize join cache
+        # initialize join caches
         self._joined_daos = set()
+        self._joined_tables = set()
         conditions = self.translate_query(self.root_condition)
-        self.sql_query = self.sql_query.where(conditions)
+        if conditions is not None:
+            self.sql_query = self.sql_query.where(conditions)
 
     def evaluate(self):
         bound_query = self.session.scalars(self.sql_query)
@@ -101,23 +106,105 @@ class EQLTranslator:
         """
         Translate an eql.AND query into an sql.AND.
         :param query: EQL query
-        :return: SQL expression
+        :return: SQL expression or None if all parts are handled via JOINs.
         """
-        return and_(*[self.translate_query(c) for c in query._children_])
+        parts = [self.translate_query(c) for c in query._children_]
+        parts = [p for p in parts if p is not None]
+        if not parts:
+            return None
+        return and_(*parts)
 
     def translate_or(self, query: OR):
         """
         Translate an eql.OR query into an sql.OR.
         :param query: EQL query
-        :return: SQL expression
+        :return: SQL expression or None if all parts are handled via JOINs.
         """
-        return or_(*[self.translate_query(c) for c in query._children_])
+        parts = [self.translate_query(c) for c in query._children_]
+        parts = [p for p in parts if p is not None]
+        if not parts:
+            return None
+        return or_(*parts)
 
     def translate_comparator(self, query: Comparator):
         """
-        Translate an eql.Comparator query into a SQLAlchemy binary expression.
+        Translate an eql.Comparator query into a SQLAlchemy binary expression, or perform JOINs for
+        equality between attributes of different symbolic variables.
         Supports ==, !=, <, <=, >, >=, and 'in'.
         """
+        # Special-case: equality between attributes of two different variables -> JOIN with ON clause
+        if query.operation == '==' and isinstance(query.left, Attribute) and isinstance(query.right, Attribute):
+            # Extract leaf variables and base DAOs
+            def leaf_variable(attr: Attribute):
+                node = attr
+                while isinstance(node, Attribute):
+                    node = node._child_
+                return node
+
+            def base_dao_of(attr: Attribute):
+                leaf = leaf_variable(attr)
+                return get_dao_class(leaf._cls_)
+
+            def last_attr_name(attr: Attribute):
+                node = attr
+                while isinstance(node, Attribute) and isinstance(node._child_, Attribute):
+                    node = node._child_
+                return attr._attr_name_ if not isinstance(attr._child_, Attribute) else node._attr_name_
+
+            left_leaf = leaf_variable(query.left)
+            right_leaf = leaf_variable(query.right)
+            left_dao = base_dao_of(query.left)
+            right_dao = base_dao_of(query.right)
+
+            # Only apply if leaves (variables) differ
+            if left_leaf is not right_leaf and left_dao is not None and right_dao is not None:
+                # Determine if last attribute on both sides are relationships and obtain their local FK columns
+                def rel_and_fk(dao_cls, attr_name):
+                    mapper = sqlalchemy.inspection.inspect(dao_cls)
+                    rel = mapper.relationships.get(attr_name) if hasattr(mapper.relationships, 'get') else None
+                    if rel is None:
+                        for r in mapper.relationships:
+                            if r.key == attr_name:
+                                rel = r
+                                break
+                    if rel is None:
+                        return None, None
+                    # choose first local column key (assumes single-column FK)
+                    col = next(iter(rel.local_columns))
+                    fk_col = getattr(dao_cls, col.key)
+                    return rel, fk_col
+
+                # Find the immediate attribute names accessed on each variable
+                # For simple variable.attr expressions, that's query.left._attr_name_ and query.right._attr_name_
+                left_attr_name = query.left._attr_name_
+                right_attr_name = query.right._attr_name_
+
+                left_rel, left_fk = rel_and_fk(left_dao, left_attr_name)
+                right_rel, right_fk = rel_and_fk(right_dao, right_attr_name)
+
+                if left_rel is not None and right_rel is not None:
+                    # Build JOIN to the non-anchor DAO with ON clause being the equality condition
+                    anchor_dao = get_dao_class(self.select_like.selected_variable_._cls_)
+                    if anchor_dao is None:
+                        raise EQLTranslationError("Selected variable has no DAO class")
+
+                    # Decide which side to join (the one that is not the anchor)
+                    if left_dao is anchor_dao:
+                        target_dao, target_fk, anchor_fk = right_dao, right_fk, left_fk
+                    else:
+                        target_dao, target_fk, anchor_fk = left_dao, left_fk, right_fk
+
+                    if self._joined_tables is None:
+                        self._joined_tables = set()
+
+                    if target_dao not in self._joined_tables:
+                        onclause = (target_fk == anchor_fk)
+                        self.sql_query = self.sql_query.join(target_dao, onclause=onclause)
+                        self._joined_tables.add(target_dao)
+                    # handled via JOIN; no WHERE part for this comparator
+                    return None
+
+        # Fallback: evaluate both sides as SQL expressions/values
         def to_sql_side(side):
             # Attribute -> resolved SQLA column (with joins if needed)
             if isinstance(side, Attribute):
