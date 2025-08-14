@@ -41,7 +41,12 @@ class EQLTestCase(unittest.TestCase):
 
         query = an(entity(position := let(Position, []), position.z > 3), show_tree=False)
 
-        results = eql_to_sql(query, self.session).evaluate()
+        translator = eql_to_sql(query, self.session)
+        query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
+
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
+        results = translator.evaluate()
 
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], PositionDAO)
@@ -55,7 +60,12 @@ class EQLTestCase(unittest.TestCase):
 
         query = an(entity(position := let(Position, []), Or(position.z == 4, position.x == 2)), show_tree=False)
 
-        result = eql_to_sql(query, self.session).evaluate()
+        translator = eql_to_sql(query, self.session)
+
+        query_by_hand = select(PositionDAO).where((PositionDAO.z == 4) | (PositionDAO.x == 2))
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
+        result = translator.evaluate()
 
         # Assert: rows with z==4 and x==2 should be returned (2 rows)
         zs = sorted([r.z for r in result])
@@ -71,16 +81,16 @@ class EQLTestCase(unittest.TestCase):
         self.session.commit()
 
         query = an(entity(pose := let(Pose, []), pose.position.z > 3), show_tree=False)
+        translator = eql_to_sql(query, self.session)
+        query_by_hand = select(PoseDAO).join(PositionDAO).where(PositionDAO.z > 3)
 
-        # Act
-        result = eql_to_sql(query, self.session).evaluate()
+        result = translator.evaluate()
 
         # Assert: only the pose with position.z == 4 should match
-        rows = result
-        self.assertEqual(len(rows), 1)
-        self.assertIsInstance(rows[0], PoseDAO)
-        self.assertIsNotNone(rows[0].position)
-        self.assertEqual(rows[0].position.z, 4)
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], PoseDAO)
+        self.assertIsNotNone(result[0].position)
+        self.assertEqual(result[0].position.z, 4)
     #
     # def test_translate_in_operator(self):
     #     # Arrange

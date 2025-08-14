@@ -143,7 +143,8 @@ def translate_attribute(query: Attribute):
     :param query: EQL query
     :return: SQL query
     """
-    cls = query._leaf_._cls_
+    cls = query._child_._cls_
+    print(cls)
     dao_class = get_dao_class(cls)
     column = getattr(dao_class, query._attr_name_)
     return column
