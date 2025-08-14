@@ -170,7 +170,8 @@ class EQLTestCase(unittest.TestCase):
         world = World(1, [Container("Container1"), Container("Container2"), Handle("Handle1"), Handle("Handle2")])
         c1_c2 = Prismatic(world.bodies[0], world.bodies[1])
         c2_h2 = Fixed(world.bodies[1], world.bodies[3])
-        world.connections = [c1_c2, c2_h2]
+        c1_h2_fixed = Fixed(world.bodies[0], world.bodies[3])
+        world.connections = [c1_c2, c2_h2, c1_h2_fixed]
 
         dao = to_dao(world)
         self.session.add(dao)
@@ -193,8 +194,6 @@ class EQLTestCase(unittest.TestCase):
                            )
                     )
 
-
-
         parent_container = aliased(ContainerDAO)
         drawer_body = aliased(ContainerDAO)
         handle = aliased(HandleDAO)
@@ -206,7 +205,8 @@ class EQLTestCase(unittest.TestCase):
             .join_from(FixedDAO, handle, FixedDAO.child_id == handle.id)
         )
 
-        # result = self.session.execute(query_by_hand).one()
+        result = self.session.execute(query_by_hand).one()
+
         translator = eql_to_sql(query, self.session)
         self.assertEqual(str(translator.sql_query), str(query_by_hand))
         #
