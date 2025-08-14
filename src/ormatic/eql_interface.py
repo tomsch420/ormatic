@@ -115,26 +115,37 @@ class EQLTranslator:
 
     def translate_comparator(self, query: Comparator):
         """
-        Translate an eql.Comparator query into an sql.Comparator.
-        :param query: EQL query
-        :return: SQL expression
+        Translate an eql.Comparator query into a SQLAlchemy binary expression.
+        Supports ==, !=, <, <=, >, >=, and 'in'.
         """
-        left = self.translate_attribute(query.left) if isinstance(query.left, Attribute) else self._literal_from_variable_domain(query.left)
-        right = self.translate_attribute(query.right) if isinstance(query.right, Attribute) else self._literal_from_variable_domain(query.right)
+        def to_sql_side(side):
+            # Attribute -> resolved SQLA column (with joins if needed)
+            if isinstance(side, Attribute):
+                return self.translate_attribute(side)
+            # EQL Variable/literal with domain
+            if isinstance(side, HasDomain):
+                return self._literal_from_variable_domain(side)
+            # Plain Python literal or iterable
+            return side
 
-        # Apply the comparison operator
-        if query.operation == '==':
+        left = to_sql_side(query.left)
+        right = to_sql_side(query.right)
+
+        op = query.operation
+        if op == '==':
             return left == right
-        elif query.operation == '>':
+        elif op == '>':
             return left > right
-        elif query.operation == '<':
+        elif op == '<':
             return left < right
-        elif query.operation == '>=':
+        elif op == '>=':
             return left >= right
-        elif query.operation == '<=':
+        elif op == '<=':
             return left <= right
-        elif query.operation == '!=':
+        elif op == '!=':
             return left != right
+        elif op == 'in':
+            return left.in_(right)
         else:
             raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
