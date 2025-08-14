@@ -58,6 +58,18 @@ class BackreferenceMappingDAO(Base, DataAccessObject[classes.example_classes.Bac
     reference: Mapped[ReferenceDAO] = relationship('ReferenceDAO', uselist=False, foreign_keys=[reference_id], post_update=True)
 
 
+class BodyDAO(Base, DataAccessObject[classes.example_classes.Body]):
+    __tablename__ = 'BodyDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    worlddao_bodies_id: Mapped[Optional[int]] = mapped_column(ForeignKey('WorldDAO.id', use_alter=True), nullable=True)
+
+
+
 class ParentBaseMappingDAO(Base, DataAccessObject[classes.example_classes.ParentBaseMapping]):
     __tablename__ = 'ParentBaseMappingDAO'
 
@@ -88,6 +100,26 @@ class ParentDAO(Base, DataAccessObject[classes.example_classes.Parent]):
     __mapper_args__ = {
         'polymorphic_on': 'polymorphic_type',
         'polymorphic_identity': 'ParentDAO',
+    }
+
+class ConnectionDAO(Base, DataAccessObject[classes.example_classes.Connection]):
+    __tablename__ = 'ConnectionDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    parent_id: Mapped[int] = mapped_column(ForeignKey('BodyDAO.id', use_alter=True), nullable=True)
+    child_id: Mapped[int] = mapped_column(ForeignKey('BodyDAO.id', use_alter=True), nullable=True)
+    worlddao_connections_id: Mapped[Optional[int]] = mapped_column(ForeignKey('WorldDAO.id', use_alter=True), nullable=True)
+
+    parent: Mapped[BodyDAO] = relationship('BodyDAO', uselist=False, foreign_keys=[parent_id], post_update=True)
+    child: Mapped[BodyDAO] = relationship('BodyDAO', uselist=False, foreign_keys=[child_id], post_update=True)
+
+    __mapper_args__ = {
+        'polymorphic_on': 'polymorphic_type',
+        'polymorphic_identity': 'ConnectionDAO',
     }
 
 class ContainerDAO(Base, DataAccessObject[classes.example_classes.Container]):
@@ -386,6 +418,19 @@ class VectorsWithPropertyMappedDAO(Base, DataAccessObject[classes.example_classe
     vectors: Mapped[List[VectorMappedDAO]] = relationship('VectorMappedDAO', foreign_keys='[VectorMappedDAO.vectorswithpropertymappeddao_vectors_id]', post_update=True)
 
 
+class WorldDAO(Base, DataAccessObject[classes.example_classes.World]):
+    __tablename__ = 'WorldDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    id_: Mapped[int]
+
+
+
+    bodies: Mapped[List[BodyDAO]] = relationship('BodyDAO', foreign_keys='[BodyDAO.worlddao_bodies_id]', post_update=True)
+    connections: Mapped[List[ConnectionDAO]] = relationship('ConnectionDAO', foreign_keys='[ConnectionDAO.worlddao_connections_id]', post_update=True)
+
+
 class ChildBaseMappingDAO(ParentBaseMappingDAO, DataAccessObject[classes.example_classes.ChildBaseMapping]):
     __tablename__ = 'ChildBaseMappingDAO'
 
@@ -413,6 +458,34 @@ class ChildMappedDAO(ParentDAO, DataAccessObject[classes.example_classes.ChildMa
     __mapper_args__ = {
         'polymorphic_identity': 'ChildMappedDAO',
         'inherit_condition': id == ParentDAO.id,
+    }
+
+class PrismaticDAO(ConnectionDAO, DataAccessObject[classes.example_classes.Prismatic]):
+    __tablename__ = 'PrismaticDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(ConnectionDAO.id), primary_key=True)
+
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'PrismaticDAO',
+        'inherit_condition': id == ConnectionDAO.id,
+    }
+
+class FixedDAO(ConnectionDAO, DataAccessObject[classes.example_classes.Fixed]):
+    __tablename__ = 'FixedDAO'
+
+    id: Mapped[int] = mapped_column(ForeignKey(ConnectionDAO.id), primary_key=True)
+
+
+
+
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'FixedDAO',
+        'inherit_condition': id == ConnectionDAO.id,
     }
 
 class DerivedEntityDAO(CustomEntityDAO, DataAccessObject[classes.example_classes.DerivedEntity]):

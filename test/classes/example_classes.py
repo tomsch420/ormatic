@@ -366,3 +366,31 @@ class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     def create_from_dao(self) -> T:
         return ChildBase(self.name, 0)
+
+
+@dataclass
+class Body:
+    name: str
+
+
+@dataclass
+class Connection:
+    parent: Body
+    child: Body
+
+
+@dataclass
+class Prismatic(Connection):
+    ...
+
+
+@dataclass
+class Fixed(Connection):
+    ...
+
+
+@dataclass
+class World:
+    id_: int
+    bodies: List[Body]
+    connections: List[Connection] = field(default_factory=list)

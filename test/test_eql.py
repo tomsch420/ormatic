@@ -1,12 +1,15 @@
 import unittest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import Session, configure_mappers
 
-from entity_query_language.entity import let, an, entity
+from entity_query_language.entity import let, an, entity, the
 from entity_query_language import Or, in_
 
-from classes.example_classes import Position, Pose, Orientation
-from classes.sqlalchemy_interface import Base, PositionDAO, PoseDAO, OrientationDAO
+from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body
+from classes.sqlalchemy_interface import Base, PositionDAO, PoseDAO, OrientationDAO, ParentDAO, WorldDAO, FixedDAO, \
+    PrismaticDAO
+from ormatic.dao import to_dao
 
 from ormatic.eql_interface import eql_to_sql
 from ormatic.utils import drop_database
@@ -115,6 +118,45 @@ class EQLTestCase(unittest.TestCase):
         # Assert: x in {1,7}
         xs = sorted([r.x for r in result])
         self.assertEqual(xs, [1, 7])
+
+    def test_the_quantifier(self):
+        self.session.add(PositionDAO(x=1, y=2, z=3))
+        self.session.add(PositionDAO(x=5, y=2, z=6))
+        self.session.commit()
+
+        query = the(entity(position := let(Position, []), position.y == 2), show_tree=False)
+        translator = eql_to_sql(query, self.session)
+        query_by_hand = select(PositionDAO).where(PositionDAO.y == 2)
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
+        with self.assertRaises(MultipleResultsFound):
+            result = translator.evaluate()
+
+    def test_equal(self):
+        # Create the world with its bodies and connections
+        world = World(1, [Body("Container1"), Body("Container2"), Body("Handle1"), Body("Handle2")])
+        c1_c2 = Prismatic(world.bodies[0], world.bodies[1])
+        c2_h2 = Fixed(world.bodies[1], world.bodies[3])
+        world.connections = [c1_c2, c2_h2]
+
+        dao = to_dao(world)
+        self.session.add(dao)
+        self.session.commit()
+
+        # Query for the kinematic tree of the drawer which has more than one component.
+        # Declare the placeholders
+        prismatic_connection = let(type_=Prismatic, domain=world.connections)
+        fixed_connection = let(type_=Fixed, domain=world.connections)
+
+        # Write the query body
+        result = an(entity(fixed_connection,
+                               fixed_connection.parent == prismatic_connection.child)
+                    )
+        translator = eql_to_sql(result, self.session)
+
+        query_by_hand = select(FixedDAO).join(PrismaticDAO, onclause=PrismaticDAO.child_id == FixedDAO.parent_id)
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
 
 
 if __name__ == '__main__':
