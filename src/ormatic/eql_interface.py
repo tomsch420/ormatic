@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Dict, List, Tuple, Any, Optional
 
-from sqlalchemy import and_, or_, select, inspect
-from sqlalchemy.orm import aliased, RelationshipProperty
+from sqlalchemy import and_, or_, select, inspect, Select
+from sqlalchemy.orm import aliased, RelationshipProperty, Session
 
 from entity_query_language.symbolic import (
     SymbolicExpression,
@@ -12,7 +13,7 @@ from entity_query_language.symbolic import (
     Comparator,
     AND,
     OR,
-    LogicalOperator,
+    LogicalOperator, An, The
 )
 
 from .dao import get_dao_class, NoDAOFoundError
@@ -21,219 +22,128 @@ from .dao import get_dao_class, NoDAOFoundError
 class EQLTranslationError(Exception):
     """Raised when an EQL expression cannot be translated into SQLAlchemy."""
 
-
-def eql_to_sqlalchemy(expr: SymbolicExpression):
+@dataclass
+class EQLTranslator:
     """
-    Translate an entity_query_language SymbolicExpression into a SQLAlchemy selectable.
+    Translate an EQL query into an SQLAlchemy query.
 
-    - Variables referring to domain classes are replaced by their DAO variants
-      (using ormatic.dao.get_dao_class).
-    - Produces a SQLAlchemy select() with appropriate WHERE conditions.
-    - Supports implicit joins via dot-notation over configured SQLAlchemy relationships.
+    This assumes the query has a structure like:
+    - quantifier (an/the)
+        - select like (entity, setof)
+            - Root Condition
+                - child 1
+                - child 2
+                - ...
 
-    :param expr: The EQL SymbolicExpression to translate.
-    :return: A SQLAlchemy Select object.
-    :raises NoDAOFoundError: If a variable class has no DAO mapping.
-    :raises EQLTranslationError: If the expression contains unsupported constructs.
     """
 
-    # 1) Collect variables and map to DAO classes; create an alias per variable
-    var_instances: List[Variable] = [v for v in getattr(expr, "all_leaf_instances_", []) if isinstance(v, Variable)]
+    eql_query: SymbolicExpression
+    session: Session
 
-    # Keep only variables that represent entities (i.e., that have a DAO); constants will not have DAOs
-    var_entity_instances: List[Variable] = []
-    alias_map: Dict[int, Any] = {}
+    sql_query: Optional[Select] = None
 
-    for v in var_instances:
-        dao_cls = get_dao_class(v.cls_) if v.cls_ is not None else None
-        if dao_cls is not None:
-            var_entity_instances.append(v)
-            alias_map[v.id_] = aliased(dao_cls)
+    @property
+    def quantifier(self):
+        return self.eql_query
 
-    if not alias_map:
-        # Nothing to select from; expression doesn't reference any known entity
-        raise EQLTranslationError("No entity variables with DAO mappings were found in the expression.")
+    @property
+    def select_like(self):
+        return self.eql_query._child_
 
-    # Context for relationship joins and alias caching
-    alias_map["_joins"] = []  # List[Tuple[left_alias, relationship_name, right_alias]]
-    alias_map["_rel_alias_cache"] = {}
+    @property
+    def root_condition(self):
+        return self.eql_query._child_._child_
 
-    # 2) Build the WHERE condition by recursively translating the expression
-    where_clause = _to_sql_condition(expr, alias_map)
+    def translate(self) -> List[Any]:
+        dao_class = get_dao_class(self.select_like.selected_variable_._cls_)
 
-    # 3) Build select list (one selectable per variable-entity alias, stable order)
-    # Use the order of first appearance of variable instances
-    selectables = [alias_map[v.id_] for v in var_entity_instances if v.id_ in alias_map]
+        sql_query = select(dao_class)
 
-    stmt = select(*selectables)
+        conditions = translate_query(self.root_condition)
+        self.sql_query = sql_query.where(conditions)
 
-    # 4) Apply recorded joins
-    for left_alias, rel_name, right_alias in alias_map.get("_joins", []):
-        rel_attr = getattr(left_alias, rel_name)
-        try:
-            rel_attr = rel_attr.of_type(right_alias)
-        except Exception:
-            # of_type is only available on relationship comparator; if not, keep as is
-            pass
-        stmt = stmt.join(rel_attr)
+    def evaluate(self):
+        bound_query = self.session.scalars(self.sql_query)
 
-    # 5) Apply WHERE
-    if where_clause is not None:
-        stmt = stmt.where(where_clause)
-    return stmt
+        # apply the quantifier
+        if isinstance(self.quantifier, An):
+            return bound_query.all()
 
+        elif isinstance(self.quantifier, The):
+            return bound_query.one()
 
-def _to_sql_condition(expr: SymbolicExpression, alias_map: Dict[int, Any]):
-    """Translate an EQL expression into a SQLAlchemy boolean condition."""
-    if isinstance(expr, Comparator):
-        left = _operand_to_sql(expr.left_, alias_map)
-        right = _operand_to_sql(expr.right_, alias_map)
-
-        op = expr.operation_
-        if op == "==":
-            return left == right
-        elif op == "!=":
-            return left != right
-        elif op == ">":
-            return left > right
-        elif op == ">=":
-            return left >= right
-        elif op == "<":
-            return left < right
-        elif op == "<=":
-            return left <= right
-        elif op == "in":
-            # Right-hand side can be a list/iterable or a selectable/expression
-            if isinstance(right, (list, tuple, set)):
-                return left.in_(list(right))
-            return left.in_(right)
         else:
-            raise EQLTranslationError(f"Unsupported comparator operation: {op}")
+            raise EQLTranslationError(f"Unknown quantifier: {type(self.quantifier)}")
 
-    if isinstance(expr, AND):
-        left = _to_sql_condition(expr.left_, alias_map)
-        right = _to_sql_condition(expr.right_, alias_map)
-        if left is None:
-            return right
-        if right is None:
-            return left
-        return and_(left, right)
+    def __iter__(self):
+        yield from self.evaluate()
 
-    if isinstance(expr, OR):
-        left = _to_sql_condition(expr.left_, alias_map)
-        right = _to_sql_condition(expr.right_, alias_map)
-        if left is None:
-            return right
-        if right is None:
-            return left
-        return or_(left, right)
+def eql_to_sql(query: SymbolicExpression, session: Session):
+    result = EQLTranslator(query, session)
+    result.translate()
+    return result
 
-    if isinstance(expr, LogicalOperator):
-        # Other logical forms not explicitly handled
-        raise EQLTranslationError(f"Unsupported logical operator: {type(expr).__name__}")
-
-    # Fallback: if it's a bare Attribute/Variable used as a truthy check, unsupported
-    return None
+def translate_query(query: SymbolicExpression):
+    if isinstance(query, AND):
+        return translate_and(query)
+    elif isinstance(query, OR):
+        return translate_or(query)
+    elif isinstance(query, Comparator):
+        return translate_comparator(query)
+    elif isinstance(query, Attribute):
+        return translate_attribute(query)
+    else:
+        raise EQLTranslationError(f"Unknown query type: {type(query)}")
 
 
-def _operand_to_sql(operand: SymbolicExpression, alias_map: Dict[int, Any]):
+def translate_and(query: AND):
     """
-    Convert an operand (Attribute, Variable, or literal-wrapped Variable) to a SQLAlchemy expression or Python value.
-    - For Attribute chains: resolve to alias.column.
-    - For Variables with DAOs: return the table alias itself (rare in comparisons).
-    - For literal Variables (constants): return the literal Python value.
+    Translate an eql.AND query into an sql.AND.
+    :param query: EQL query
+    :return: SQL query
     """
-    # Attribute chain
-    if isinstance(operand, Attribute):
-        base_alias, attr_chain = _resolve_attribute_chain(operand, alias_map)
-        # Traverse the chain on the SQLAlchemy alias, inserting joins when traversing relationships
-        current_alias = base_alias
-        for name in attr_chain:
-            # Detect if 'name' is a relationship on current_alias
-            try:
-                mapper = inspect(current_alias).mapper
-            except Exception:
-                mapper = None
-            rel_alias_cache = alias_map.get("_rel_alias_cache", {})
-            joins: List[Tuple[Any, str, Any]] = alias_map.get("_joins", [])
+    return and_(*[translate_query(c) for c in query._children_])
 
-            if mapper is not None and name in mapper.relationships:
-                rel_prop = mapper.relationships[name]
-                cache_key = (id(current_alias), name)
-                if cache_key in rel_alias_cache:
-                    next_alias = rel_alias_cache[cache_key]
-                else:
-                    # The related class should already be a DAO class from the autogenerated interface
-                    target_cls = rel_prop.mapper.class_
-                    next_alias = aliased(target_cls)
-                    # record join and cache
-                    rel_alias_cache[cache_key] = next_alias
-                    # Avoid duplicate join records
-                    if not any(la is current_alias and rn == name and ra is next_alias for la, rn, ra in joins):
-                        joins.append((current_alias, name, next_alias))
-                # update the shared structures
-                alias_map["_rel_alias_cache"] = rel_alias_cache
-                alias_map["_joins"] = joins
-                current_alias = next_alias
-            else:
-                # Regular column/attribute access on the current alias
-                try:
-                    current_alias = getattr(current_alias, name)
-                except AttributeError as e:
-                    raise EQLTranslationError(f"Unknown attribute '{name}' on {current_alias}") from e
-        return current_alias
-
-    # Variable
-    if isinstance(operand, Variable):
-        # If variable corresponds to an entity, return its alias
-        if operand.id_ in alias_map:
-            return alias_map[operand.id_]
-        # Otherwise, it's likely a literal (wrapped) value
-        const = _variable_to_constant(operand)
-        return const
-
-    # Unsupported operand type
-    raise EQLTranslationError(f"Unsupported operand type: {type(operand).__name__}")
-
-
-def _variable_to_constant(var: Variable):
-    """Extract the Python literal from a Variable that represents a constant domain of one element."""
-    domain = getattr(var, "domain_", None)
-    if domain is None:
-        # If it has a cls_ and no DAO mapping, still attempt to instantiate? Prefer not.
-        raise EQLTranslationError("Variable without domain cannot be used as a literal.")
-    # The domain is a HashedIterable; attempt to get first (they store by id/index)
-    try:
-        # Iterate to fetch first
-        for hv in domain:
-            return hv.value if hasattr(hv, "value") else hv
-    except Exception:
-        pass
-    # Some domains may be plain iterables
-    try:
-        return next(iter(domain))
-    except Exception as e:
-        raise EQLTranslationError("Unable to extract literal value from variable domain.") from e
-
-
-def _resolve_attribute_chain(attr: Attribute, alias_map: Dict[int, Any]) -> Tuple[Any, List[str]]:
+def translate_or(query: OR):
     """
-    Given an Attribute DomainMapping, return (base_alias, [attr,...]) where base_alias is the
-    SQLAlchemy alias for the underlying Variable and the attr list is the chain of attribute names.
+    Translate an eql.OR query into an sql.OR.
+    :param query: EQL query
+    :return: SQL query
     """
-    chain: List[str] = []
-    current = attr
-    # Walk down to the base Variable, collecting attribute names from outside to inside
-    while isinstance(current, Attribute):
-        chain.insert(0, current.attr_name_)
-        current = current.child_
+    return or_(*[translate_query(c) for c in query._children_])
 
-    if not isinstance(current, Variable):
-        raise EQLTranslationError("Attribute chain does not terminate at a Variable.")
+def translate_comparator(query: Comparator):
+    """
+    Translate an eql.Comparator query into an sql.Comparator.
+    :param query: EQL query
+    :return: SQL query
+    """
+    left = translate_attribute(query.left) if isinstance(query.left, Attribute) else next(iter(query.left._domain_)).value
+    right = translate_attribute(query.right) if isinstance(query.right, Attribute) else next(iter(query.right._domain_)).value
 
-    base_var: Variable = current
-    if base_var.id_ not in alias_map:
-        raise NoDAOFoundError(base_var.cls_)
+    # Apply the comparison operator
+    if query.operation == '==':
+        return left == right
+    elif query.operation == '>':
+        return left > right
+    elif query.operation == '<':
+        return left < right
+    elif query.operation == '>=':
+        return left >= right
+    elif query.operation == '<=':
+        return left <= right
+    elif query.operation == '!=':
+        return left != right
+    else:
+        raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
-    base_alias = alias_map[base_var.id_]
-    return base_alias, chain
+def translate_attribute(query: Attribute):
+    """
+    Translate an eql.Attribute query into an sql.Attribute.
+    :param query: EQL query
+    :return: SQL query
+    """
+    cls = query._leaf_._cls_
+    dao_class = get_dao_class(cls)
+    column = getattr(dao_class, query._attr_name_)
+    return column

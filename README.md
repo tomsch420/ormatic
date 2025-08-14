@@ -87,7 +87,7 @@ from entity_query_language.symbolic import Or, in_
 from classes.example_classes import Position
 from classes.sqlalchemy_interface import Base, PositionDAO
 
-from ormatic.eql_interface import eql_to_sqlalchemy
+from ormatic.eql_interface import eql_to_sql
 
 # Initialize in-memory DB
 configure_mappers()
@@ -108,17 +108,17 @@ position = let(type_=Position, domain=[Position(0, 0, 0)])  # domain content is 
 expr = position.z > 3  # simple comparator
 
 # Translate to SQLAlchemy and execute
-stmt = eql_to_sqlalchemy(expr)
+stmt = eql_to_sql(expr)
 rows = session.scalars(stmt).all()  # → PositionDAO rows with z > 3
 
 # More complex logic
 expr2 = Or(position.z == 4, position.x == 2)
-stmt2 = eql_to_sqlalchemy(expr2)
+stmt2 = eql_to_sql(expr2)
 rows2 = session.scalars(stmt2).all()  # rows where z == 4 OR x == 2
 
 # Using "in" operator
 expr3 = in_(position.x, [1, 7])
-stmt3 = eql_to_sqlalchemy(expr3)
+stmt3 = eql_to_sql(expr3)
 rows3 = session.scalars(stmt3).all()  # rows where x ∈ {1, 7}
 ```
 
