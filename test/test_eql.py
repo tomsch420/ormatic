@@ -84,6 +84,8 @@ class EQLTestCase(unittest.TestCase):
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PoseDAO).join(PositionDAO).where(PositionDAO.z > 3)
 
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
         result = translator.evaluate()
 
         # Assert: only the pose with position.z == 4 should match
@@ -91,22 +93,28 @@ class EQLTestCase(unittest.TestCase):
         self.assertIsInstance(result[0], PoseDAO)
         self.assertIsNotNone(result[0].position)
         self.assertEqual(result[0].position.z, 4)
-    #
-    # def test_translate_in_operator(self):
-    #     # Arrange
-    #     self._add_positions([(1, 2, 3), (5, 2, 6), (7, 8, 9)])
-    #
-    #     # Build EQL expression: position.x in [1, 7]
-    #     position = let(type_=Position, domain=[Position(0, 0, 0)])
-    #     expr = in_(position.x, [1, 7])
-    #
-    #     # Act
-    #     stmt = eql_to_sql(expr)
-    #     rows = self.session.scalars(stmt).all()
-    #
-    #     # Assert: x in {1,7}
-    #     xs = sorted([r.x for r in rows])
-    #     self.assertEqual(xs, [1, 7])
+
+    def test_translate_in_operator(self):
+        self.session.add(PositionDAO(x=1, y=2, z=3))
+        self.session.add(PositionDAO(x=5, y=2, z=6))
+        self.session.add(PositionDAO(x=7, y=8, z=9))
+        self.session.commit()
+
+
+        query = an(entity(position := let(Position, []),
+                          in_(position.x, [1, 7])), show_tree=False)
+
+        # Act
+        translator = eql_to_sql(query, self.session)
+
+        query_by_hand = select(PositionDAO).where(PositionDAO.x.in_([1, 7]))
+        self.assertEqual(str(translator.sql_query), str(query_by_hand))
+
+        result = translator.evaluate()
+
+        # Assert: x in {1,7}
+        xs = sorted([r.x for r in result])
+        self.assertEqual(xs, [1, 7])
 
 
 if __name__ == '__main__':

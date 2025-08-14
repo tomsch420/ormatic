@@ -1,26 +1,28 @@
+# python
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Any, Optional
+from typing import List, Any, Optional
 
-from sqlalchemy import and_, or_, select, inspect, Select
-from sqlalchemy.orm import aliased, RelationshipProperty, Session
+import sqlalchemy.inspection
+from sqlalchemy import and_, or_, select, Select
+from sqlalchemy.orm import Session
 
 from entity_query_language.symbolic import (
     SymbolicExpression,
-    Variable,
     Attribute,
     Comparator,
     AND,
     OR,
-    LogicalOperator, An, The, HasDomain
+    An, The, HasDomain
 )
 
-from .dao import get_dao_class, NoDAOFoundError
+from .dao import get_dao_class
 
 
 class EQLTranslationError(Exception):
     """Raised when an EQL expression cannot be translated into SQLAlchemy."""
+
 
 @dataclass
 class EQLTranslator:
@@ -41,6 +43,7 @@ class EQLTranslator:
     session: Session
 
     sql_query: Optional[Select] = None
+    _joined_daos: set[type] = None
 
     @property
     def quantifier(self):
@@ -56,11 +59,11 @@ class EQLTranslator:
 
     def translate(self) -> List[Any]:
         dao_class = get_dao_class(self.select_like.selected_variable_._cls_)
-
-        sql_query = select(dao_class)
-
-        conditions = translate_query(self.root_condition)
-        self.sql_query = sql_query.where(conditions)
+        self.sql_query = select(dao_class)
+        # initialize join cache
+        self._joined_daos = set()
+        conditions = self.translate_query(self.root_condition)
+        self.sql_query = self.sql_query.where(conditions)
 
     def evaluate(self):
         bound_query = self.session.scalars(self.sql_query)
@@ -78,77 +81,124 @@ class EQLTranslator:
     def __iter__(self):
         yield from self.evaluate()
 
+    # --------------------------
+    # Refactored translator API
+    # --------------------------
+
+    def translate_query(self, query: SymbolicExpression):
+        if isinstance(query, AND):
+            return self.translate_and(query)
+        elif isinstance(query, OR):
+            return self.translate_or(query)
+        elif isinstance(query, Comparator):
+            return self.translate_comparator(query)
+        elif isinstance(query, Attribute):
+            return self.translate_attribute(query)
+        else:
+            raise EQLTranslationError(f"Unknown query type: {type(query)}")
+
+    def translate_and(self, query: AND):
+        """
+        Translate an eql.AND query into an sql.AND.
+        :param query: EQL query
+        :return: SQL expression
+        """
+        return and_(*[self.translate_query(c) for c in query._children_])
+
+    def translate_or(self, query: OR):
+        """
+        Translate an eql.OR query into an sql.OR.
+        :param query: EQL query
+        :return: SQL expression
+        """
+        return or_(*[self.translate_query(c) for c in query._children_])
+
+    def translate_comparator(self, query: Comparator):
+        """
+        Translate an eql.Comparator query into an sql.Comparator.
+        :param query: EQL query
+        :return: SQL expression
+        """
+        left = self.translate_attribute(query.left) if isinstance(query.left, Attribute) else self._literal_from_variable_domain(query.left)
+        right = self.translate_attribute(query.right) if isinstance(query.right, Attribute) else self._literal_from_variable_domain(query.right)
+
+        # Apply the comparison operator
+        if query.operation == '==':
+            return left == right
+        elif query.operation == '>':
+            return left > right
+        elif query.operation == '<':
+            return left < right
+        elif query.operation == '>=':
+            return left >= right
+        elif query.operation == '<=':
+            return left <= right
+        elif query.operation == '!=':
+            return left != right
+        else:
+            raise EQLTranslationError(f"Unknown operator: {query.operation}")
+
+    def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
+        # EQL Variables/literals expose a domain where the value can be taken from.
+        return next(iter(var_like._domain_)).value
+
+    def translate_attribute(self, query: Attribute):
+        """
+        Translate an eql.Attribute query into an sql construct, traversing attribute chains
+        and applying necessary JOINs for relationships. Returns the final SQLAlchemy column.
+        """
+        # Collect the attribute chain names from outermost to leaf
+        names: list[str] = []
+        node = query
+        while isinstance(node, Attribute):
+            names.append(node._attr_name_)
+            node = node._child_
+
+        # Start at the base DAO of the leaf variable
+        base_cls = node._cls_
+        if base_cls is None:
+            raise EQLTranslationError("Attribute chain leaf does not have a class.")
+        current_dao = get_dao_class(base_cls)
+        if current_dao is None:
+            raise EQLTranslationError(f"No DAO class found for {base_cls}.")
+
+        # Walk the chain from the base outward
+        names = list(reversed(names))
+        for idx, name in enumerate(names):
+            mapper = sqlalchemy.inspection.inspect(current_dao)
+            # relationship keys
+            rel = mapper.relationships.get(name) if hasattr(mapper.relationships, 'get') else None
+            if rel is None:
+                # check by iterating if .get not available
+                for r in mapper.relationships:
+                    if r.key == name:
+                        rel = r
+                        break
+            if rel is not None:
+                # join using explicit relationship attribute to disambiguate path
+                path_key = (current_dao, name)
+                if self._joined_daos is None:
+                    self._joined_daos = set()
+                if path_key not in self._joined_daos:
+                    self.sql_query = self.sql_query.join(getattr(current_dao, name))
+                    self._joined_daos.add(path_key)
+                current_dao = rel.entity.class_
+                continue
+
+            # Not a relationship -> treat as column; must be terminal element
+            if idx != len(names) - 1:
+                raise EQLTranslationError(
+                    f"Attribute '{name}' on {current_dao.__name__} is not a relationship but chain continues.")
+            try:
+                return getattr(current_dao, name)
+            except AttributeError as e:
+                raise EQLTranslationError(f"Column '{name}' not found on {current_dao.__name__}.") from e
+
+        # If we finished the loop without returning, chain ended on a relationship, which isn't supported here
+        raise EQLTranslationError("Attribute chain ended on a relationship; expected a column.")
+
+
 def eql_to_sql(query: SymbolicExpression, session: Session):
     result = EQLTranslator(query, session)
     result.translate()
     return result
-
-def translate_query(query: SymbolicExpression):
-    if isinstance(query, AND):
-        return translate_and(query)
-    elif isinstance(query, OR):
-        return translate_or(query)
-    elif isinstance(query, Comparator):
-        return translate_comparator(query)
-    elif isinstance(query, Attribute):
-        return translate_attribute(query)
-    else:
-        raise EQLTranslationError(f"Unknown query type: {type(query)}")
-
-
-def translate_and(query: AND):
-    """
-    Translate an eql.AND query into an sql.AND.
-    :param query: EQL query
-    :return: SQL query
-    """
-    return and_(*[translate_query(c) for c in query._children_])
-
-def translate_or(query: OR):
-    """
-    Translate an eql.OR query into an sql.OR.
-    :param query: EQL query
-    :return: SQL query
-    """
-    return or_(*[translate_query(c) for c in query._children_])
-
-def translate_comparator(query: Comparator):
-    """
-    Translate an eql.Comparator query into an sql.Comparator.
-    :param query: EQL query
-    :return: SQL query
-    """
-    left = translate_attribute(query.left) if isinstance(query.left, Attribute) else _literal_from_variable_domain(query.left)
-    right = translate_attribute(query.right) if isinstance(query.right, Attribute) else _literal_from_variable_domain(query.right)
-
-    # Apply the comparison operator
-    if query.operation == '==':
-        return left == right
-    elif query.operation == '>':
-        return left > right
-    elif query.operation == '<':
-        return left < right
-    elif query.operation == '>=':
-        return left >= right
-    elif query.operation == '<=':
-        return left <= right
-    elif query.operation == '!=':
-        return left != right
-    else:
-        raise EQLTranslationError(f"Unknown operator: {query.operation}")
-
-def _literal_from_variable_domain(var_like: HasDomain) -> Any:
-    # EQL Variables/literals expose a domain where the value can be taken from.
-    return next(iter(var_like._domain_)).value
-
-
-def translate_attribute(query: Attribute):
-    """
-    Translate an eql.Attribute query into an sql.Attribute.
-    :param query: EQL query
-    :return: SQL query
-    """
-    cls = query._child_._cls_
-    dao_class = get_dao_class(cls)
-    column = getattr(dao_class, query._attr_name_)
-    return column
