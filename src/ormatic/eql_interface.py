@@ -13,7 +13,7 @@ from entity_query_language.symbolic import (
     Comparator,
     AND,
     OR,
-    LogicalOperator, An, The
+    LogicalOperator, An, The, HasDomain
 )
 
 from .dao import get_dao_class, NoDAOFoundError
@@ -118,8 +118,8 @@ def translate_comparator(query: Comparator):
     :param query: EQL query
     :return: SQL query
     """
-    left = translate_attribute(query.left) if isinstance(query.left, Attribute) else next(iter(query.left._domain_)).value
-    right = translate_attribute(query.right) if isinstance(query.right, Attribute) else next(iter(query.right._domain_)).value
+    left = translate_attribute(query.left) if isinstance(query.left, Attribute) else _literal_from_variable_domain(query.left)
+    right = translate_attribute(query.right) if isinstance(query.right, Attribute) else _literal_from_variable_domain(query.right)
 
     # Apply the comparison operator
     if query.operation == '==':
@@ -137,6 +137,11 @@ def translate_comparator(query: Comparator):
     else:
         raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
+def _literal_from_variable_domain(var_like: HasDomain) -> Any:
+    # EQL Variables/literals expose a domain where the value can be taken from.
+    return next(iter(var_like._domain_)).value
+
+
 def translate_attribute(query: Attribute):
     """
     Translate an eql.Attribute query into an sql.Attribute.
@@ -144,7 +149,6 @@ def translate_attribute(query: Attribute):
     :return: SQL query
     """
     cls = query._child_._cls_
-    print(cls)
     dao_class = get_dao_class(cls)
     column = getattr(dao_class, query._attr_name_)
     return column
