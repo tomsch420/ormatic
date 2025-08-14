@@ -193,7 +193,7 @@ class EQLTestCase(unittest.TestCase):
                            )
                     )
 
-        translator = eql_to_sql(query, self.session)
+
 
         parent_container = aliased(ContainerDAO)
         drawer_body = aliased(ContainerDAO)
@@ -206,10 +206,8 @@ class EQLTestCase(unittest.TestCase):
             .join_from(FixedDAO, handle, FixedDAO.child_id == handle.id)
         )
 
-        result = self.session.scalars(query_by_hand).one()
-
-
-
+        # result = self.session.execute(query_by_hand).one()
+        translator = eql_to_sql(query, self.session)
         self.assertEqual(str(translator.sql_query), str(query_by_hand))
         #
         # result = (query.evaluate())
