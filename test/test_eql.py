@@ -7,9 +7,9 @@ from entity_query_language.entity import let, an, entity, the, set_of, And
 from entity_query_language import Or, in_
 
 from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body, Handle, \
-    Container
+    Container, ContainerBody
 from classes.sqlalchemy_interface import Base, PositionDAO, PoseDAO, OrientationDAO, ParentDAO, WorldDAO, FixedDAO, \
-    PrismaticDAO, BodyDAO, ContainerDAO, HandleDAO
+    PrismaticDAO, BodyDAO, ContainerBodyDAO, HandleDAO
 from ormatic.dao import to_dao
 
 from ormatic.eql_interface import eql_to_sql
@@ -167,7 +167,7 @@ class EQLTestCase(unittest.TestCase):
 
     def test_complicated_equal(self):
         # Create the world with its bodies and connections
-        world = World(1, [Container("Container1"), Container("Container2"), Handle("Handle1"), Handle("Handle2")])
+        world = World(1, [ContainerBody("Container1"), ContainerBody("Container2"), Handle("Handle1"), Handle("Handle2")])
         c1_c2 = Prismatic(world.bodies[0], world.bodies[1])
         c2_h2 = Fixed(world.bodies[1], world.bodies[3])
         c1_h2_fixed = Fixed(world.bodies[0], world.bodies[3])

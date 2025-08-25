@@ -377,7 +377,7 @@ class Handle(Body):
     ...
 
 @dataclass
-class Container(Body):
+class ContainerBody(Body):
     ...
 
 

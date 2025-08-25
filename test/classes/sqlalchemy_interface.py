@@ -127,6 +127,17 @@ class ConnectionDAO(Base, DataAccessObject[classes.example_classes.Connection]):
         'polymorphic_identity': 'ConnectionDAO',
     }
 
+class ContainerDAO(Base, DataAccessObject[classes.example_classes.Container]):
+    __tablename__ = 'ContainerDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+
+
+    items: Mapped[List[ItemWithBackreferenceDAO]] = relationship('ItemWithBackreferenceDAO', foreign_keys='[ItemWithBackreferenceDAO.containerdao_items_id]', post_update=True)
+
+
 class CustomEntityDAO(Base, DataAccessObject[classes.example_classes.CustomEntity]):
     __tablename__ = 'CustomEntityDAO'
 
@@ -178,6 +189,7 @@ class ItemWithBackreferenceDAO(Base, DataAccessObject[classes.example_classes.It
     value: Mapped[int]
 
 
+    containerdao_items_id: Mapped[Optional[int]] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
     container_id: Mapped[int] = mapped_column(ForeignKey('ContainerDAO.id', use_alter=True), nullable=True)
 
     container: Mapped[ContainerDAO] = relationship('ContainerDAO', uselist=False, foreign_keys=[container_id], post_update=True)
@@ -438,8 +450,8 @@ class HandleDAO(BodyDAO, DataAccessObject[classes.example_classes.Handle]):
         'inherit_condition': id == BodyDAO.id,
     }
 
-class ContainerDAO(BodyDAO, DataAccessObject[classes.example_classes.Container]):
-    __tablename__ = 'ContainerDAO'
+class ContainerBodyDAO(BodyDAO, DataAccessObject[classes.example_classes.ContainerBody]):
+    __tablename__ = 'ContainerBodyDAO'
 
     id: Mapped[int] = mapped_column(ForeignKey(BodyDAO.id), primary_key=True)
 
@@ -448,7 +460,7 @@ class ContainerDAO(BodyDAO, DataAccessObject[classes.example_classes.Container])
 
 
     __mapper_args__ = {
-        'polymorphic_identity': 'ContainerDAO',
+        'polymorphic_identity': 'ContainerBodyDAO',
         'inherit_condition': id == BodyDAO.id,
     }
 
