@@ -238,7 +238,28 @@ class EQLTranslator:
 
     def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
         # EQL Variables/literals expose a domain where the value can be taken from.
-        return next(iter(var_like._domain_)).value
+        entity = next(iter(var_like._domain_)).value
+        
+        # If it's an entity object, we need to find its DAO and get the ID
+        from .dao import get_dao_class
+        dao_class = get_dao_class(type(entity))
+        if dao_class is not None:
+            # Find the DAO instance for this entity
+            # We need to query the database to find the DAO that matches this entity
+            dao_instance = self.session.query(dao_class).filter_by(**self._get_entity_filter(entity)).first()
+            if dao_instance is not None:
+                return dao_instance.id
+        
+        # Fallback to the entity itself (for non-entity literals)
+        return entity
+    
+    def _get_entity_filter(self, entity) -> dict:
+        """Get filter criteria to find the DAO instance for an entity."""
+        # This is a simple implementation that works for entities with a 'name' attribute
+        if hasattr(entity, 'name'):
+            return {'name': entity.name}
+        # Add more sophisticated matching logic as needed
+        return {}
 
     def translate_attribute(self, query: Attribute):
         """
@@ -273,15 +294,22 @@ class EQLTranslator:
                         rel = r
                         break
             if rel is not None:
-                # join using explicit relationship attribute to disambiguate path
-                path_key = (current_dao, name)
-                if self._joined_daos is None:
-                    self._joined_daos = set()
-                if path_key not in self._joined_daos:
-                    self.sql_query = self.sql_query.join(getattr(current_dao, name))
-                    self._joined_daos.add(path_key)
-                current_dao = rel.entity.class_
-                continue
+                # If this is the last element in the chain, return the FK column instead of joining
+                if idx == len(names) - 1:
+                    # Return the foreign key column that backs this relationship
+                    # Get the first local column (assumes single-column FK)
+                    local_col = next(iter(rel.local_columns))
+                    return getattr(current_dao, local_col.key)
+                else:
+                    # join using explicit relationship attribute to disambiguate path
+                    path_key = (current_dao, name)
+                    if self._joined_daos is None:
+                        self._joined_daos = set()
+                    if path_key not in self._joined_daos:
+                        self.sql_query = self.sql_query.join(getattr(current_dao, name))
+                        self._joined_daos.add(path_key)
+                    current_dao = rel.entity.class_
+                    continue
 
             # Not a relationship -> treat as column; must be terminal element
             if idx != len(names) - 1:
@@ -292,8 +320,8 @@ class EQLTranslator:
             except AttributeError as e:
                 raise EQLTranslationError(f"Column '{name}' not found on {current_dao.__name__}.") from e
 
-        # If we finished the loop without returning, chain ended on a relationship, which isn't supported here
-        raise EQLTranslationError("Attribute chain ended on a relationship; expected a column.")
+        # If we get here, the loop completed without returning, which shouldn't happen with the new logic
+        raise EQLTranslationError("Attribute chain processing error.")
 
 
 def eql_to_sql(query: SymbolicExpression, session: Session):
