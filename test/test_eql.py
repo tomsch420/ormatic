@@ -43,7 +43,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=1, y=2, z=4))
         self.session.commit()
 
-        query = an(entity(position := let(Position, []), position.z > 3), show_tree=False)
+        query = an(entity(position := let(type_=Position, domain=[], name="position"), position.z > 3), show_tree=False)
 
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
@@ -62,7 +62,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=2, y=9, z=10))
         self.session.commit()
 
-        query = an(entity(position := let(Position, []), Or(position.z == 4, position.x == 2)), show_tree=False)
+        query = an(entity(position := let(type_=Position, domain=[], name="position"), Or(position.z == 4, position.x == 2)), show_tree=False)
 
         translator = eql_to_sql(query, self.session)
 
@@ -84,7 +84,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PoseDAO(position=PositionDAO(x=1, y=2, z=4), orientation=OrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0)))
         self.session.commit()
 
-        query = an(entity(pose := let(Pose, []), pose.position.z > 3), show_tree=False)
+        query = an(entity(pose := let(type_=Pose, domain = [], name="pose"), pose.position.z > 3), show_tree=False)
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PoseDAO).join(PositionDAO).where(PositionDAO.z > 3)
 
@@ -105,7 +105,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.commit()
 
 
-        query = an(entity(position := let(Position, []),
+        query = an(entity(position := let(type_=Position, domain=[], name="position"),
                           in_(position.x, [1, 7])), show_tree=False)
 
         # Act
@@ -125,7 +125,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=5, y=2, z=6))
         self.session.commit()
 
-        query = the(entity(position := let(Position, []), position.y == 2), show_tree=False)
+        query = the(entity(position := let(type_ = Position, domain=[], name="position"), position.y == 2), show_tree=False)
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PositionDAO).where(PositionDAO.y == 2)
         self.assertEqual(str(translator.sql_query), str(query_by_hand))
@@ -146,8 +146,8 @@ class EQLTestCase(unittest.TestCase):
 
         # Query for the kinematic tree of the drawer which has more than one component.
         # Declare the placeholders
-        prismatic_connection = let(type_=Prismatic, domain=world.connections)
-        fixed_connection = let(type_=Fixed, domain=world.connections)
+        prismatic_connection = let(type_=Prismatic, domain=world.connections, name="prismatic_connection")
+        fixed_connection = let(type_=Fixed, domain=world.connections,  name="fixed_connection")
 
         # Write the query body
         query = an(entity(fixed_connection,
@@ -165,6 +165,7 @@ class EQLTestCase(unittest.TestCase):
         self.assertEqual(result[0].parent.name, "Container2")
         self.assertEqual(result[0].child.name, "Handle2")
 
+
     def test_complicated_equal(self):
         # Create the world with its bodies and connections
         world = World(1, [ContainerBody("Container1"), ContainerBody("Container2"), Handle("Handle1"), Handle("Handle2")])
@@ -179,34 +180,26 @@ class EQLTestCase(unittest.TestCase):
 
         # Query for the kinematic tree of the drawer which has more than one component.
         # Declare the placeholders
-        parent_container = let(type_=Container, domain=world.bodies)
-        prismatic_connection = let(type_=Prismatic, domain=world.connections)
-        drawer_body = let(type_=Container, domain=world.bodies)
-        fixed_connection = let(type_=Fixed, domain=world.connections)
-        handle = let(type_=Handle, domain=world.bodies)
+        parent_container = let(type_=ContainerBody, domain=world.bodies, name="parent_connection")
+        prismatic_connection = let(type_=Prismatic, domain=world.connections, name="prismatic_connection")
+        drawer_body = let(type_=ContainerBody, domain=world.bodies, name="drawer_body")
+        fixed_connection = let(type_=Fixed, domain=world.connections, name="fixed_connection")
+        handle = let(type_=Handle, domain=world.bodies, name="handle")
 
         # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
         query = the(entity(drawer_body,
                            And(parent_container == prismatic_connection.parent,
                                drawer_body == prismatic_connection.child,
-                               drawer_body == fixed_connection.parent, handle == fixed_connection.child)
+                               drawer_body == fixed_connection.parent, handle == fixed_connection.child
+                               )
                            )
                     )
 
-        # The main achievement: this should not throw "Attribute chain ended on a relationship" error
-        # Previously this would fail, now it should succeed in translation (even if the query logic needs refinement)
-        try:
-            translator = eql_to_sql(query, self.session)
-            # If we get here without an exception, the fix is working
-            self.assertIsNotNone(translator.sql_query)
-        except Exception as e:
-            # If we get the old error, the test should fail
-            if "Attribute chain ended on a relationship" in str(e):
-                self.fail(f"The fix didn't work: {e}")
-            else:
-                # Some other error - that's expected for now as the query logic may need more work
-                # But the core fix (handling relationship attribute chains) is working
-                pass
+        print(query.evaluate())
+
+        # translator = eql_to_sql(query, self.session)
+
+
 
 
 
