@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Any, Optional
+import operator
 
 import sqlalchemy.inspection
 from sqlalchemy import and_, or_, select, Select
@@ -61,7 +62,7 @@ class EQLTranslator:
         return self.eql_query._child_._child_
 
     def translate(self) -> List[Any]:
-        dao_class = get_dao_class(self.select_like.selected_variable_._cls_)
+        dao_class = get_dao_class(self.select_like.selected_variable_._type_)
         self.sql_query = select(dao_class)
         # initialize join caches
         self._joined_daos = set()
@@ -105,25 +106,57 @@ class EQLTranslator:
     def translate_and(self, query: AND):
         """
         Translate an eql.AND query into an sql.AND.
+        Supports binary AND nodes (left/right) introduced in newer EQL.
         :param query: EQL query
         :return: SQL expression or None if all parts are handled via JOINs.
         """
-        parts = [self.translate_query(c) for c in query._children_]
-        parts = [p for p in parts if p is not None]
+        parts = []
+        # New API: binary tree with left/right
+        if hasattr(query, 'left') and hasattr(query, 'right'):
+            left_part = self.translate_query(query.left)
+            right_part = self.translate_query(query.right)
+            if left_part is not None:
+                parts.append(left_part)
+            if right_part is not None:
+                parts.append(right_part)
+        else:
+            # Backward compatibility: list of children
+            children = getattr(query, '_children_', None) or []
+            for c in children:
+                p = self.translate_query(c)
+                if p is not None:
+                    parts.append(p)
         if not parts:
             return None
+        if len(parts) == 1:
+            return parts[0]
         return and_(*parts)
 
     def translate_or(self, query: OR):
         """
         Translate an eql.OR query into an sql.OR.
+        Supports binary OR nodes (left/right) introduced in newer EQL.
         :param query: EQL query
         :return: SQL expression or None if all parts are handled via JOINs.
         """
-        parts = [self.translate_query(c) for c in query._children_]
-        parts = [p for p in parts if p is not None]
+        parts = []
+        if hasattr(query, 'left') and hasattr(query, 'right'):
+            left_part = self.translate_query(query.left)
+            right_part = self.translate_query(query.right)
+            if left_part is not None:
+                parts.append(left_part)
+            if right_part is not None:
+                parts.append(right_part)
+        else:
+            children = getattr(query, '_children_', None) or []
+            for c in children:
+                p = self.translate_query(c)
+                if p is not None:
+                    parts.append(p)
         if not parts:
             return None
+        if len(parts) == 1:
+            return parts[0]
         return or_(*parts)
 
     def translate_comparator(self, query: Comparator):
@@ -133,7 +166,8 @@ class EQLTranslator:
         Supports ==, !=, <, <=, >, >=, and 'in'.
         """
         # Special-case: equality between attributes of two different variables -> JOIN with ON clause
-        if query.operation == '==' and isinstance(query.left, Attribute) and isinstance(query.right, Attribute):
+        if (getattr(query.operation, '__name__', None) == 'eq' or query.operation is operator.eq) \
+                and isinstance(query.left, Attribute) and isinstance(query.right, Attribute):
             # Extract leaf variables and base DAOs
             def leaf_variable(attr: Attribute):
                 node = attr
@@ -143,7 +177,7 @@ class EQLTranslator:
 
             def base_dao_of(attr: Attribute):
                 leaf = leaf_variable(attr)
-                return get_dao_class(leaf._cls_)
+                return get_dao_class(leaf._type_)
 
             def last_attr_name(attr: Attribute):
                 node = attr
@@ -184,7 +218,7 @@ class EQLTranslator:
 
                 if left_rel is not None and right_rel is not None:
                     # Build JOIN to the non-anchor DAO with ON clause being the equality condition
-                    anchor_dao = get_dao_class(self.select_like.selected_variable_._cls_)
+                    anchor_dao = get_dao_class(self.select_like.selected_variable_._type_)
                     if anchor_dao is None:
                         raise EQLTranslationError("Selected variable has no DAO class")
 
@@ -219,22 +253,33 @@ class EQLTranslator:
         right = to_sql_side(query.right)
 
         op = query.operation
-        if op == '==':
+        # Map callable operations to SQLAlchemy expressions
+        if op is operator.eq or getattr(op, '__name__', None) == 'eq':
             return left == right
-        elif op == '>':
+        if op is operator.gt or getattr(op, '__name__', None) == 'gt':
             return left > right
-        elif op == '<':
+        if op is operator.lt or getattr(op, '__name__', None) == 'lt':
             return left < right
-        elif op == '>=':
+        if op is operator.ge or getattr(op, '__name__', None) == 'ge':
             return left >= right
-        elif op == '<=':
+        if op is operator.le or getattr(op, '__name__', None) == 'le':
             return left <= right
-        elif op == '!=':
+        if op is operator.ne or getattr(op, '__name__', None) == 'ne':
             return left != right
-        elif op == 'in':
-            return left.in_(right)
-        else:
-            raise EQLTranslationError(f"Unknown operator: {query.operation}")
+        # contains(a, b) means b in a
+        name = getattr(op, '__name__', '')
+        if op is operator.contains or name in ('contains', 'not_contains'):
+            # Orientation: right should be column/attribute, left should be iterable
+            expr = right.in_(left)
+            if name == 'not_contains':
+                # SQLAlchemy not in
+                try:
+                    return right.notin_(left)
+                except AttributeError:
+                    from sqlalchemy import not_ as sa_not
+                    return sa_not(expr)
+            return expr
+        raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
     def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
         # EQL Variables/literals expose a domain where the value can be taken from.
@@ -274,7 +319,7 @@ class EQLTranslator:
             node = node._child_
 
         # Start at the base DAO of the leaf variable
-        base_cls = node._cls_
+        base_cls = getattr(node, '_type_', None)
         if base_cls is None:
             raise EQLTranslationError("Attribute chain leaf does not have a class.")
         current_dao = get_dao_class(base_cls)

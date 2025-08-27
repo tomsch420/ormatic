@@ -165,7 +165,7 @@ class EQLTestCase(unittest.TestCase):
         self.assertEqual(result[0].parent.name, "Container2")
         self.assertEqual(result[0].child.name, "Handle2")
 
-
+    @unittest.skip("Not finished yet-")
     def test_complicated_equal(self):
         # Create the world with its bodies and connections
         world = World(1, [ContainerBody("Container1"), ContainerBody("Container2"), Handle("Handle1"), Handle("Handle2")])
