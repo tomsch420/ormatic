@@ -388,6 +388,7 @@ class DataAccessObject(HasGeneric[T]):
 
         # if i am the child of an alternatively mapped parent
         base = self.__class__.__bases__[0]
+        base_kwargs = {}
         if issubclass(base, DataAccessObject) and issubclass(base.original_class(), AlternativeMapping):
 
             # construct the super class from the super dao
@@ -406,21 +407,22 @@ class DataAccessObject(HasGeneric[T]):
             # now safely reconstruct the parent domain object
             base_result = parent_dao.from_dao(memo=memo, in_progress=in_progress)
 
-            # fill the gaps from the base result
+            # fill the gaps from the base result into kwargs for __init__
             for argument in argument_names:
-                if not hasattr(result, argument):
+                if argument not in kwargs:
                     try:
-                        setattr(result, argument, getattr(base_result, argument))
+                        base_kwargs[argument] = getattr(base_result, argument)
                     except AttributeError:
                         ...
 
-        # Assign all attributes manually
-        for key, val in kwargs.items():
-            setattr(result, key, val)
-
-        # Optional: Call __post_init__ if it exists
-        if hasattr(result, "__post_init__"):
-            result.__post_init__()
+        # Call the original __init__ to ensure proper initialization (e.g., default_factory fields)
+        try:
+            init_args = {**base_kwargs, **kwargs}
+            result.__init__(**init_args)
+        except TypeError as e:
+            logging.getLogger(__name__).debug(f"from_dao __init__ call failed with {e}; falling back to manual assignment")
+            for key, val in init_args.items():
+                setattr(result, key, val)
 
         # Fix circular references
         for key, value in circular_refs.items():
