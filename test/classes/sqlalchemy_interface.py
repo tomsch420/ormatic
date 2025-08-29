@@ -299,6 +299,17 @@ class PositionsDAO(Base, DataAccessObject[classes.example_classes.Positions]):
         'polymorphic_identity': 'PositionsDAO',
     }
 
+class PrivateDefaultFactoryDAO(Base, DataAccessObject[classes.example_classes.PrivateDefaultFactory]):
+    __tablename__ = 'PrivateDefaultFactoryDAO'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    public_value: Mapped[int]
+
+
+
+
+
 class ReferenceDAO(Base, DataAccessObject[classes.example_classes.Reference]):
     __tablename__ = 'ReferenceDAO'
 

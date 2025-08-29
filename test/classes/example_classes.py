@@ -366,3 +366,8 @@ class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
 
     def create_from_dao(self) -> T:
         return ChildBase(self.name, 0)
+
+@dataclass
+class PrivateDefaultFactory:
+    public_value: int = 0
+    _private_list: List[int] = field(default_factory=list)

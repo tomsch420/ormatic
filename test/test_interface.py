@@ -442,6 +442,12 @@ class InterfaceTestCase(unittest.TestCase):
         self.assertEqual(child_from_dao, child)
         self.assertEqual(parent_from_dao, parent)
 
+    def test_private_factories(self):
+        obj = PrivateDefaultFactory()
+        dao = to_dao(obj)
+        reconstructed: PrivateDefaultFactory = dao.from_dao()
+        self.assertEqual(reconstructed._private_list, [])
+
 
 if __name__ == '__main__':
     unittest.main()
