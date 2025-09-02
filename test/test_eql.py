@@ -3,8 +3,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import Session, configure_mappers, aliased
 
-from entity_query_language.entity import let, an, entity, the, set_of, And
-from entity_query_language import Or, in_
+from entity_query_language.entity import let, an, entity, the, set_of
+from entity_query_language import and_, or_, in_
 
 from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body, Handle, \
     Container, ContainerBody
@@ -43,7 +43,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=1, y=2, z=4))
         self.session.commit()
 
-        query = an(entity(position := let(type_=Position, domain=[], name="position"), position.z > 3), show_tree=False)
+        query = an(entity(position := let(type_=Position, domain=[], name="position"), position.z > 3))
 
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PositionDAO).where(PositionDAO.z > 3)
@@ -62,7 +62,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=2, y=9, z=10))
         self.session.commit()
 
-        query = an(entity(position := let(type_=Position, domain=[], name="position"), Or(position.z == 4, position.x == 2)), show_tree=False)
+        query = an(entity(position := let(type_=Position, domain=[], name="position"), or_(position.z == 4, position.x == 2)))
 
         translator = eql_to_sql(query, self.session)
 
@@ -84,7 +84,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PoseDAO(position=PositionDAO(x=1, y=2, z=4), orientation=OrientationDAO(w=1.0, x=0.0, y=0.0, z=0.0)))
         self.session.commit()
 
-        query = an(entity(pose := let(type_=Pose, domain = [], name="pose"), pose.position.z > 3), show_tree=False)
+        query = an(entity(pose := let(type_=Pose, domain = [], name="pose"), pose.position.z > 3))
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PoseDAO).join(PositionDAO).where(PositionDAO.z > 3)
 
@@ -106,7 +106,7 @@ class EQLTestCase(unittest.TestCase):
 
 
         query = an(entity(position := let(type_=Position, domain=[], name="position"),
-                          in_(position.x, [1, 7])), show_tree=False)
+                          in_(position.x, [1, 7])))
 
         # Act
         translator = eql_to_sql(query, self.session)
@@ -125,7 +125,7 @@ class EQLTestCase(unittest.TestCase):
         self.session.add(PositionDAO(x=5, y=2, z=6))
         self.session.commit()
 
-        query = the(entity(position := let(type_ = Position, domain=[], name="position"), position.y == 2), show_tree=False)
+        query = the(entity(position := let(type_ = Position, domain=[], name="position"), position.y == 2))
         translator = eql_to_sql(query, self.session)
         query_by_hand = select(PositionDAO).where(PositionDAO.y == 2)
         self.assertEqual(str(translator.sql_query), str(query_by_hand))
@@ -188,7 +188,7 @@ class EQLTestCase(unittest.TestCase):
 
         # Write the query body - this was previously failing with "Attribute chain ended on a relationship"
         query = the(entity(drawer_body,
-                           And(parent_container == prismatic_connection.parent,
+                           and_(parent_container == prismatic_connection.parent,
                                drawer_body == prismatic_connection.child,
                                drawer_body == fixed_connection.parent, handle == fixed_connection.child
                                )
