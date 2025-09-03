@@ -213,6 +213,27 @@ class EQLTestCase(unittest.TestCase):
 
         self.assertEqual(body1, result[0])
 
+    def test_contains_collection(self):
+        # Test that collection containment (IN operation) still works
+        body1 = BodyDAO(name="Body1")
+        body2 = BodyDAO(name="Body2") 
+        body3 = BodyDAO(name="Body3")
+        self.session.add(body1)
+        self.session.add(body2)
+        self.session.add(body3)
+        self.session.commit()
+
+        # Test collection containment: find bodies whose names are in the given list
+        query = an(entity(b := let(type_=Body, domain=[], name="b"), contains(["Body1", "Body3"], b.name)))
+        translator = eql_to_sql(query, self.session)
+
+        result = translator.evaluate()
+        
+        # Should find bodies with names "Body1" and "Body3"
+        self.assertEqual(len(result), 2)
+        result_names = sorted([r.name for r in result])
+        self.assertEqual(result_names, ["Body1", "Body3"])
+
 
 
 

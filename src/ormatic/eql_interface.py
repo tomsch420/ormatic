@@ -269,16 +269,31 @@ class EQLTranslator:
         # contains(a, b) means b in a
         name = getattr(op, '__name__', '')
         if op is operator.contains or name in ('contains', 'not_contains'):
-            # Orientation: right should be column/attribute, left should be iterable
-            expr = right.in_(left)
-            if name == 'not_contains':
-                # SQLAlchemy not in
-                try:
-                    return right.notin_(left)
-                except AttributeError:
+            # Handle string containment vs collection containment
+            if isinstance(left, str):
+                # String containment: check if string `left` contains substring `right`
+                # We want to check if `left` contains `right` as a substring
+                # In SQL: left LIKE '%' + right + '%'
+                from sqlalchemy import func, literal
+                # Create a literal for the left string and a pattern with wildcards around right
+                left_literal = literal(left)
+                pattern = func.concat('%', right, '%')
+                expr = left_literal.like(pattern)
+                if name == 'not_contains':
                     from sqlalchemy import not_ as sa_not
                     return sa_not(expr)
-            return expr
+                return expr
+            else:
+                # Collection containment: right should be column/attribute, left should be iterable
+                expr = right.in_(left)
+                if name == 'not_contains':
+                    # SQLAlchemy not in
+                    try:
+                        return right.notin_(left)
+                    except AttributeError:
+                        from sqlalchemy import not_ as sa_not
+                        return sa_not(expr)
+                return expr
         raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
     def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
