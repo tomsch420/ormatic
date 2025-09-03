@@ -27,9 +27,11 @@ class Base(DeclarativeBase):
 
 {% for table in wrapped_tables %}
 class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{ table.clazz.__module__ }}.{{ table.clazz.__name__ }}]):
+    {% if inheritance_strategy == 'joined' or table.parent_table is none %}
     __tablename__ = '{{ table.tablename }}'
 
     {{ table.primary_key_name }}: Mapped[int] = {{ table.primary_key }}
+    {% endif %}
 
     {% for name, type in table.builtin_columns %}
     {{ name }}: {{ type }}

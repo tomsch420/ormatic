@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, fields, Field, is_dataclass
 from functools import cached_property, lru_cache
 from typing import Any, Optional, Tuple, Set
 from typing import TextIO
+from enum import Enum
 
 import rustworkx as rx
 from sqlalchemy import TypeDecorator
@@ -16,6 +17,11 @@ from .field_info import FieldInfo
 from .sqlalchemy_generator import SQLAlchemyGenerator
 
 logger = logging.getLogger(__name__)
+
+
+class InheritanceStrategy(Enum):
+    JOINED = "joined"
+    SINGLE = "single"
 
 
 class ORMatic:
@@ -62,11 +68,24 @@ class ORMatic:
     """
 
     def __init__(self, classes: List[Type],
-                 type_mappings: Dict[Type, TypeDecorator] = None):
+                 type_mappings: Dict[Type, TypeDecorator] = None,
+                 inheritance_strategy: "InheritanceStrategy | str" = InheritanceStrategy.JOINED):
         """
         :param classes: The list of classes to be mapped.
         :param type_mappings: A dict that maps classes to custom types that should be used instead of the class.
+        :param inheritance_strategy: Inheritance strategy to use; can be an InheritanceStrategy enum member or one of the strings "joined"/"single". Default is InheritanceStrategy.JOINED.
         """
+
+        # Normalize inheritance strategy to enum (backward-compatible for string inputs)
+        if isinstance(inheritance_strategy, InheritanceStrategy):
+            self.inheritance_strategy = inheritance_strategy
+        elif isinstance(inheritance_strategy, str):
+            try:
+                self.inheritance_strategy = InheritanceStrategy(inheritance_strategy.lower())
+            except ValueError:
+                raise ValueError("inheritance_strategy must be either InheritanceStrategy.JOINED/InheritanceStrategy.SINGLE or the strings 'joined'/'single'")
+        else:
+            raise TypeError("inheritance_strategy must be an InheritanceStrategy or a string 'joined'/'single'")
 
         if type_mappings is None:
             self.type_mappings = dict()
@@ -249,11 +268,20 @@ class WrappedTable:
         if self.parent_table is not None:
             self.mapper_args.update({
                 "'polymorphic_identity'": f"'{self.tablename}'",
-                "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}"
             })
+            # only needed for joined-table inheritance
+            if self.ormatic.inheritance_strategy == InheritanceStrategy.JOINED:
+                self.mapper_args.update({
+                    "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.full_primary_key_name}"
+                })
 
     @cached_property
     def full_primary_key_name(self):
+        if self.ormatic.inheritance_strategy == InheritanceStrategy.SINGLE:
+            root = self
+            while root.parent_table is not None:
+                root = root.parent_table
+            return f"{root.tablename}.{root.primary_key_name}"
         return f"{self.tablename}.{self.primary_key_name}"
 
     @cached_property
