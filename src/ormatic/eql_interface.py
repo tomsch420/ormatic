@@ -6,7 +6,7 @@ from typing import List, Any, Optional
 import operator
 
 import sqlalchemy.inspection
-from sqlalchemy import and_, or_, select, Select
+from sqlalchemy import and_, or_, select, Select, func, literal, not_ as sa_not
 from sqlalchemy.orm import Session
 
 from entity_query_language.symbolic import (
@@ -266,19 +266,32 @@ class EQLTranslator:
             return left <= right
         if op is operator.ne or getattr(op, '__name__', None) == 'ne':
             return left != right
-        # contains(a, b) means b in a
+        # contains(a, b): for general iterables means b in a; for strings means substring containment
         name = getattr(op, '__name__', '')
         if op is operator.contains or name in ('contains', 'not_contains'):
-            # Orientation: right should be column/attribute, left should be iterable
-            expr = right.in_(left)
-            if name == 'not_contains':
-                # SQLAlchemy not in
+            is_not = (name == 'not_contains')
+            # 1) Collection membership cases
+            if isinstance(left, (list, tuple, set)):
+                expr = right.in_(left)
+            elif isinstance(right, (list, tuple, set)):
+                expr = left.in_(right)
+            # 2) String containment cases
+            elif isinstance(left, str) and not isinstance(right, str):
+                # haystack is literal string, needle is a column/expression
+                expr = func.instr(literal(left), right) > 0
+            elif not isinstance(left, str) and isinstance(right, str):
+                # haystack is column/expression, needle is literal string
                 try:
-                    return right.notin_(left)
+                    expr = left.contains(right)
                 except AttributeError:
-                    from sqlalchemy import not_ as sa_not
-                    return sa_not(expr)
-            return expr
+                    expr = left.like('%' + right + '%')
+            elif isinstance(left, str) and isinstance(right, str):
+                # both literals -> constant truth value
+                expr = literal(right in left)
+            else:
+                # both are SQL expressions/columns
+                expr = func.instr(left, right) > 0
+            return sa_not(expr) if is_not else expr
         raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
     def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
