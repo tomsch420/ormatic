@@ -3,7 +3,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import Session, configure_mappers, aliased
 
-from entity_query_language.entity import let, an, entity, the, set_of
+from entity_query_language.entity import let, an, entity, the, set_of, contains
 from entity_query_language import and_, or_, in_
 
 from classes.example_classes import Position, Pose, Orientation, Parent, World, Prismatic, Fixed, Body, Handle, \
@@ -198,6 +198,41 @@ class EQLTestCase(unittest.TestCase):
         print(query.evaluate())
 
         # translator = eql_to_sql(query, self.session)
+
+    def test_contains(self):
+        body1 = BodyDAO(name="Body1")
+        self.session.add(body1)
+        self.session.add(BodyDAO(name="Body2"))
+        self.session.add(BodyDAO(name="Body3"))
+        self.session.commit()
+
+        query = an(entity(b := let(type_=Body, domain=[], name="b"), contains("Body1TestName", b.name )))
+        translator = eql_to_sql(query, self.session)
+
+        result = translator.evaluate()
+
+        self.assertEqual(body1, result[0])
+
+    def test_contains_collection(self):
+        # Test that collection containment (IN operation) still works
+        body1 = BodyDAO(name="Body1")
+        body2 = BodyDAO(name="Body2") 
+        body3 = BodyDAO(name="Body3")
+        self.session.add(body1)
+        self.session.add(body2)
+        self.session.add(body3)
+        self.session.commit()
+
+        # Test collection containment: find bodies whose names are in the given list
+        query = an(entity(b := let(type_=Body, domain=[], name="b"), contains(["Body1", "Body3"], b.name)))
+        translator = eql_to_sql(query, self.session)
+
+        result = translator.evaluate()
+        
+        # Should find bodies with names "Body1" and "Body3"
+        self.assertEqual(len(result), 2)
+        result_names = sorted([r.name for r in result])
+        self.assertEqual(result_names, ["Body1", "Body3"])
 
 
 
