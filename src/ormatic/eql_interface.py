@@ -62,7 +62,7 @@ class EQLTranslator:
         return self.eql_query._child_._child_
 
     def translate(self) -> List[Any]:
-        dao_class = get_dao_class(self.select_like.selected_variable_._type_)
+        dao_class = get_dao_class(self.select_like.selected_variable._type_)
         self.sql_query = select(dao_class)
         # initialize join caches
         self._joined_daos = set()
