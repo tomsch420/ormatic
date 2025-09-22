@@ -1,4 +1,3 @@
-# python
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,7 +14,10 @@ from entity_query_language.symbolic import (
     Comparator,
     AND,
     OR,
-    An, The, Variable, Literal
+    An,
+    The,
+    Variable,
+    Literal,
 )
 
 from .dao import get_dao_class
@@ -112,7 +114,7 @@ class EQLTranslator:
         """
         parts = []
         # New API: binary tree with left/right
-        if hasattr(query, 'left') and hasattr(query, 'right'):
+        if hasattr(query, "left") and hasattr(query, "right"):
             left_part = self.translate_query(query.left)
             right_part = self.translate_query(query.right)
             if left_part is not None:
@@ -121,7 +123,7 @@ class EQLTranslator:
                 parts.append(right_part)
         else:
             # Backward compatibility: list of children
-            children = getattr(query, '_children_', None) or []
+            children = getattr(query, "_children_", None) or []
             for c in children:
                 p = self.translate_query(c)
                 if p is not None:
@@ -140,7 +142,7 @@ class EQLTranslator:
         :return: SQL expression or None if all parts are handled via JOINs.
         """
         parts = []
-        if hasattr(query, 'left') and hasattr(query, 'right'):
+        if hasattr(query, "left") and hasattr(query, "right"):
             left_part = self.translate_query(query.left)
             right_part = self.translate_query(query.right)
             if left_part is not None:
@@ -148,7 +150,7 @@ class EQLTranslator:
             if right_part is not None:
                 parts.append(right_part)
         else:
-            children = getattr(query, '_children_', None) or []
+            children = getattr(query, "_children_", None) or []
             for c in children:
                 p = self.translate_query(c)
                 if p is not None:
@@ -166,8 +168,14 @@ class EQLTranslator:
         Supports ==, !=, <, <=, >, >=, and 'in'.
         """
         # Special-case: equality between attributes of two different variables -> JOIN with ON clause
-        if (getattr(query.operation, '__name__', None) == 'eq' or query.operation is operator.eq) \
-                and isinstance(query.left, Attribute) and isinstance(query.right, Attribute):
+        if (
+            (
+                getattr(query.operation, "__name__", None) == "eq"
+                or query.operation is operator.eq
+            )
+            and isinstance(query.left, Attribute)
+            and isinstance(query.right, Attribute)
+        ):
             # Extract leaf variables and base DAOs
             def leaf_variable(attr: Attribute):
                 node = attr
@@ -181,9 +189,15 @@ class EQLTranslator:
 
             def last_attr_name(attr: Attribute):
                 node = attr
-                while isinstance(node, Attribute) and isinstance(node._child_, Attribute):
+                while isinstance(node, Attribute) and isinstance(
+                    node._child_, Attribute
+                ):
                     node = node._child_
-                return attr._attr_name_ if not isinstance(attr._child_, Attribute) else node._attr_name_
+                return (
+                    attr._attr_name_
+                    if not isinstance(attr._child_, Attribute)
+                    else node._attr_name_
+                )
 
             left_leaf = leaf_variable(query.left)
             right_leaf = leaf_variable(query.right)
@@ -191,11 +205,19 @@ class EQLTranslator:
             right_dao = base_dao_of(query.right)
 
             # Only apply if leaves (variables) differ
-            if left_leaf is not right_leaf and left_dao is not None and right_dao is not None:
+            if (
+                left_leaf is not right_leaf
+                and left_dao is not None
+                and right_dao is not None
+            ):
                 # Determine if last attribute on both sides are relationships and obtain their local FK columns
                 def rel_and_fk(dao_cls, attr_name):
                     mapper = sqlalchemy.inspection.inspect(dao_cls)
-                    rel = mapper.relationships.get(attr_name) if hasattr(mapper.relationships, 'get') else None
+                    rel = (
+                        mapper.relationships.get(attr_name)
+                        if hasattr(mapper.relationships, "get")
+                        else None
+                    )
                     if rel is None:
                         for r in mapper.relationships:
                             if r.key == attr_name:
@@ -218,7 +240,9 @@ class EQLTranslator:
 
                 if left_rel is not None and right_rel is not None:
                     # Build JOIN to the non-anchor DAO with ON clause being the equality condition
-                    anchor_dao = get_dao_class(self.select_like.selected_variable._type_)
+                    anchor_dao = get_dao_class(
+                        self.select_like.selected_variable._type_
+                    )
                     if anchor_dao is None:
                         raise EQLTranslationError("Selected variable has no DAO class")
 
@@ -232,8 +256,10 @@ class EQLTranslator:
                         self._joined_tables = set()
 
                     if target_dao not in self._joined_tables:
-                        onclause = (target_fk == anchor_fk)
-                        self.sql_query = self.sql_query.join(target_dao, onclause=onclause)
+                        onclause = target_fk == anchor_fk
+                        self.sql_query = self.sql_query.join(
+                            target_dao, onclause=onclause
+                        )
                         self._joined_tables.add(target_dao)
                     # handled via JOIN; no WHERE part for this comparator
                     return None
@@ -254,22 +280,22 @@ class EQLTranslator:
 
         op = query.operation
         # Map callable operations to SQLAlchemy expressions
-        if op is operator.eq or getattr(op, '__name__', None) == 'eq':
+        if op is operator.eq or getattr(op, "__name__", None) == "eq":
             return left == right
-        if op is operator.gt or getattr(op, '__name__', None) == 'gt':
+        if op is operator.gt or getattr(op, "__name__", None) == "gt":
             return left > right
-        if op is operator.lt or getattr(op, '__name__', None) == 'lt':
+        if op is operator.lt or getattr(op, "__name__", None) == "lt":
             return left < right
-        if op is operator.ge or getattr(op, '__name__', None) == 'ge':
+        if op is operator.ge or getattr(op, "__name__", None) == "ge":
             return left >= right
-        if op is operator.le or getattr(op, '__name__', None) == 'le':
+        if op is operator.le or getattr(op, "__name__", None) == "le":
             return left <= right
-        if op is operator.ne or getattr(op, '__name__', None) == 'ne':
+        if op is operator.ne or getattr(op, "__name__", None) == "ne":
             return left != right
         # contains(a, b): for general iterables means b in a; for strings means substring containment
-        name = getattr(op, '__name__', '')
-        if op is operator.contains or name in ('contains', 'not_contains'):
-            is_not = (name == 'not_contains')
+        name = getattr(op, "__name__", "")
+        if op is operator.contains or name in ("contains", "not_contains", "in_"):
+            is_not = name == "not_contains"
             # 1) Collection membership cases
             if isinstance(left, (list, tuple, set)):
                 expr = right.in_(left)
@@ -284,7 +310,7 @@ class EQLTranslator:
                 try:
                     expr = left.contains(right)
                 except AttributeError:
-                    expr = left.like('%' + right + '%')
+                    expr = left.like("%" + right + "%")
             elif isinstance(left, str) and isinstance(right, str):
                 # both literals -> constant truth value
                 expr = literal(right in left)
@@ -305,7 +331,7 @@ class EQLTranslator:
             sample = next(iter(var_like._domain_)).value
         except Exception:
             # No domain or unexpected structure; just return as-is
-            return getattr(var_like, 'value', var_like)
+            return getattr(var_like, "value", var_like)
 
         # If it's an explicit EQL Literal, return raw python value.
         if isinstance(var_like, Literal):
@@ -313,34 +339,35 @@ class EQLTranslator:
 
         # If the sample corresponds to a mapped entity, try to map to DAO id
         from .dao import get_dao_class
+
         dao_class = get_dao_class(type(sample))
         if dao_class is None:
             return sample
 
         # If it's already a DAO instance
         if isinstance(sample, dao_class):
-            return getattr(sample, 'id', sample)
+            return getattr(sample, "id", sample)
 
         # Try to resolve DAO instance by a simple unique attribute if available
         filters = {}
-        if hasattr(sample, 'id_'):
-            filters['id_'] = getattr(sample, 'id_')
-        elif hasattr(sample, 'name'):
-            filters['name'] = getattr(sample, 'name')
+        if hasattr(sample, "id_"):
+            filters["id_"] = getattr(sample, "id_")
+        elif hasattr(sample, "name"):
+            filters["name"] = getattr(sample, "name")
 
         if filters:
             dao_instance = self.session.query(dao_class).filter_by(**filters).first()
             if dao_instance is not None:
-                return getattr(dao_instance, 'id', dao_instance)
+                return getattr(dao_instance, "id", dao_instance)
 
         # Fallback
         return sample
-    
+
     def _get_entity_filter(self, entity) -> dict:
         """Get filter criteria to find the DAO instance for an entity."""
         # This is a simple implementation that works for entities with a 'name' attribute
-        if hasattr(entity, 'name'):
-            return {'name': entity.name}
+        if hasattr(entity, "name"):
+            return {"name": entity.name}
         # Add more sophisticated matching logic as needed
         return {}
 
@@ -357,7 +384,7 @@ class EQLTranslator:
             node = node._child_
 
         # Start at the base DAO of the leaf variable
-        base_cls = getattr(node, '_type_', None)
+        base_cls = getattr(node, "_type_", None)
         if base_cls is None:
             raise EQLTranslationError("Attribute chain leaf does not have a class.")
         current_dao = get_dao_class(base_cls)
@@ -369,7 +396,11 @@ class EQLTranslator:
         for idx, name in enumerate(names):
             mapper = sqlalchemy.inspection.inspect(current_dao)
             # relationship keys
-            rel = mapper.relationships.get(name) if hasattr(mapper.relationships, 'get') else None
+            rel = (
+                mapper.relationships.get(name)
+                if hasattr(mapper.relationships, "get")
+                else None
+            )
             if rel is None:
                 # check by iterating if .get not available
                 for r in mapper.relationships:
@@ -397,11 +428,14 @@ class EQLTranslator:
             # Not a relationship -> treat as column; must be terminal element
             if idx != len(names) - 1:
                 raise EQLTranslationError(
-                    f"Attribute '{name}' on {current_dao.__name__} is not a relationship but chain continues.")
+                    f"Attribute '{name}' on {current_dao.__name__} is not a relationship but chain continues."
+                )
             try:
                 return getattr(current_dao, name)
             except AttributeError as e:
-                raise EQLTranslationError(f"Column '{name}' not found on {current_dao.__name__}.") from e
+                raise EQLTranslationError(
+                    f"Column '{name}' not found on {current_dao.__name__}."
+                ) from e
 
         # If we get here, the loop completed without returning, which shouldn't happen with the new logic
         raise EQLTranslationError("Attribute chain processing error.")
