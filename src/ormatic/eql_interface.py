@@ -15,7 +15,7 @@ from entity_query_language.symbolic import (
     Comparator,
     AND,
     OR,
-    An, The, HasDomain
+    An, The, Variable, Literal
 )
 
 from .dao import get_dao_class
@@ -244,7 +244,7 @@ class EQLTranslator:
             if isinstance(side, Attribute):
                 return self.translate_attribute(side)
             # EQL Variable/literal with domain
-            if isinstance(side, HasDomain):
+            if isinstance(side, (Variable, Literal)):
                 return self._literal_from_variable_domain(side)
             # Plain Python literal or iterable
             return side
@@ -294,22 +294,47 @@ class EQLTranslator:
             return sa_not(expr) if is_not else expr
         raise EQLTranslationError(f"Unknown operator: {query.operation}")
 
-    def _literal_from_variable_domain(self, var_like: HasDomain) -> Any:
-        # EQL Variables/literals expose a domain where the value can be taken from.
-        entity = next(iter(var_like._domain_)).value
-        
-        # If it's an entity object, we need to find its DAO and get the ID
+    def _literal_from_variable_domain(self, var_like: Any) -> Any:
+        """
+        Extract a representative Python value from an EQL Variable/Literal domain for use in SQL comparisons.
+        - If it's an EQL Literal, return the literal value directly.
+        - If it's an EQL Variable with a domain of mapped entities, try to resolve to the corresponding DAO id.
+          Otherwise, return the sample value as-is (numbers/strings/etc.).
+        """
+        try:
+            sample = next(iter(var_like._domain_)).value
+        except Exception:
+            # No domain or unexpected structure; just return as-is
+            return getattr(var_like, 'value', var_like)
+
+        # If it's an explicit EQL Literal, return raw python value.
+        if isinstance(var_like, Literal):
+            return sample
+
+        # If the sample corresponds to a mapped entity, try to map to DAO id
         from .dao import get_dao_class
-        dao_class = get_dao_class(type(entity))
-        if dao_class is not None:
-            # Find the DAO instance for this entity
-            # We need to query the database to find the DAO that matches this entity
-            dao_instance = self.session.query(dao_class).filter_by(**self._get_entity_filter(entity)).first()
+        dao_class = get_dao_class(type(sample))
+        if dao_class is None:
+            return sample
+
+        # If it's already a DAO instance
+        if isinstance(sample, dao_class):
+            return getattr(sample, 'id', sample)
+
+        # Try to resolve DAO instance by a simple unique attribute if available
+        filters = {}
+        if hasattr(sample, 'id_'):
+            filters['id_'] = getattr(sample, 'id_')
+        elif hasattr(sample, 'name'):
+            filters['name'] = getattr(sample, 'name')
+
+        if filters:
+            dao_instance = self.session.query(dao_class).filter_by(**filters).first()
             if dao_instance is not None:
-                return dao_instance.id
-        
-        # Fallback to the entity itself (for non-entity literals)
-        return entity
+                return getattr(dao_instance, 'id', dao_instance)
+
+        # Fallback
+        return sample
     
     def _get_entity_filter(self, entity) -> dict:
         """Get filter criteria to find the DAO instance for an entity."""

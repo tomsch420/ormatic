@@ -82,7 +82,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, configure_mappers
 
 from entity_query_language.entity import let
-from entity_query_language.symbolic import Or, in_
+from entity_query_language import or_, in_
 
 from classes.example_classes import Position
 from classes.sqlalchemy_interface import Base, PositionDAO
@@ -112,7 +112,7 @@ stmt = eql_to_sql(expr)
 rows = session.scalars(stmt).all()  # → PositionDAO rows with z > 3
 
 # More complex logic
-expr2 = Or(position.z == 4, position.x == 2)
+expr2 = or_(position.z == 4, position.x == 2)
 stmt2 = eql_to_sql(expr2)
 rows2 = session.scalars(stmt2).all()  # rows where z == 4 OR x == 2
 
