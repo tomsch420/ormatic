@@ -167,6 +167,19 @@ class EQLTranslator:
         equality between attributes of different symbolic variables.
         Supports ==, !=, <, <=, >, >=, and 'in'.
         """
+        # Helper: extract underlying Variable and its python type from a leaf-like node
+        def _extract_var_and_type(node: Any):
+            # direct variable
+            if isinstance(node, Variable):
+                return node, getattr(node, "_type_", None)
+            # An/The/Entity wrappers often expose the variable via _var_
+            var = getattr(node, "_var_", None)
+            if isinstance(var, Variable):
+                return var, getattr(var, "_type_", None)
+            # Fallbacks
+            t = getattr(node, "_type_", None)
+            return None, t
+
         # Special-case: equality between attributes of two different variables -> JOIN with ON clause
         if (
             (
@@ -180,24 +193,16 @@ class EQLTranslator:
             def leaf_variable(attr: Attribute):
                 node = attr
                 while isinstance(node, Attribute):
-                    node = node._child_
-                return node
+                    node = getattr(node, "_child_", None)
+                var, _ = _extract_var_and_type(node)
+                return var or node
 
             def base_dao_of(attr: Attribute):
-                leaf = leaf_variable(attr)
-                return get_dao_class(leaf._type_)
-
-            def last_attr_name(attr: Attribute):
                 node = attr
-                while isinstance(node, Attribute) and isinstance(
-                    node._child_, Attribute
-                ):
-                    node = node._child_
-                return (
-                    attr._attr_name_
-                    if not isinstance(attr._child_, Attribute)
-                    else node._attr_name_
-                )
+                while isinstance(node, Attribute):
+                    node = getattr(node, "_child_", None)
+                _, t = _extract_var_and_type(node)
+                return get_dao_class(t) if t is not None else None
 
             left_leaf = leaf_variable(query.left)
             right_leaf = leaf_variable(query.right)
@@ -231,7 +236,6 @@ class EQLTranslator:
                     return rel, fk_col
 
                 # Find the immediate attribute names accessed on each variable
-                # For simple variable.attr expressions, that's query.left._attr_name_ and query.right._attr_name_
                 left_attr_name = query.left._attr_name_
                 right_attr_name = query.right._attr_name_
 
@@ -296,7 +300,22 @@ class EQLTranslator:
         name = getattr(op, "__name__", "")
         if op is operator.contains or name in ("contains", "not_contains", "in_"):
             is_not = name == "not_contains"
-            # 1) Collection membership cases
+
+            # Special-case: in_ semantics produced as contains(Literal(collection), Attribute(column)) by EQL
+            if name in ("contains", "in_") and isinstance(query.left, Literal) and isinstance(query.right, Attribute):
+                try:
+                    values = [hv.value for hv in query.left._domain_]
+                except Exception:
+                    # fallback to single literal value
+                    values = [getattr(query.left, "value", None)]
+                # If it's clearly a collection (multiple values) or a single non-string, treat as membership
+                if len(values) != 1 or (values and not isinstance(values[0], str)):
+                    col = self.translate_attribute(query.right)
+                    expr = col.in_(values)
+                    return sa_not(expr) if is_not else expr
+                # else fall through to string containment handling below
+
+            # 1) Collection membership cases for plain Python iterables
             if isinstance(left, (list, tuple, set)):
                 expr = right.in_(left)
             elif isinstance(right, (list, tuple, set)):
@@ -381,12 +400,17 @@ class EQLTranslator:
         node = query
         while isinstance(node, Attribute):
             names.append(node._attr_name_)
-            node = node._child_
+            node = getattr(node, "_child_", None)
 
-        # Start at the base DAO of the leaf variable
+        # Resolve the base python class of the variable at the leaf of the chain
         base_cls = getattr(node, "_type_", None)
         if base_cls is None:
+            var = getattr(node, "_var_", None)
+            if var is not None:
+                base_cls = getattr(var, "_type_", None)
+        if base_cls is None:
             raise EQLTranslationError("Attribute chain leaf does not have a class.")
+
         current_dao = get_dao_class(base_cls)
         if current_dao is None:
             raise EQLTranslationError(f"No DAO class found for {base_cls}.")
